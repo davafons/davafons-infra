@@ -12,7 +12,6 @@ LOCATION="${3:-hel1}"
 IMAGE="ubuntu-24.04"
 SSH_KEY_NAME="hetzner-$SERVER_NAME"
 SSH_KEY_PATH="$HOME/.ssh/$SSH_KEY_NAME"
-SETUP_URL="https://setup.davafons.cc/hetzner/setup.sh"
 
 # --- Colors ---
 GREEN='\033[0;32m'
@@ -65,6 +64,21 @@ if hcloud server describe "$SERVER_NAME" >/dev/null 2>&1; then
   error "Server '$SERVER_NAME' already exists. Delete it first: hcloud server delete $SERVER_NAME"
 fi
 
+# --- Build cloud-init user-data ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SETUP_SCRIPT="$SCRIPT_DIR/setup.sh"
+[ -f "$SETUP_SCRIPT" ] || error "setup.sh not found at $SETUP_SCRIPT"
+
+USERDATA=$(mktemp)
+trap "rm -f $USERDATA" EXIT
+cat > "$USERDATA" <<CLOUDINIT
+#!/bin/bash
+export TAILSCALE_AUTHKEY='$TAILSCALE_AUTHKEY'
+export DISCORD_WEBHOOK_URL='$DISCORD_WEBHOOK_URL'
+
+$(cat "$SETUP_SCRIPT")
+CLOUDINIT
+
 # --- Create server ---
 info "Creating server: $SERVER_NAME ($SERVER_TYPE, $IMAGE, $LOCATION)"
 hcloud server create \
@@ -72,28 +86,17 @@ hcloud server create \
   --type "$SERVER_TYPE" \
   --image "$IMAGE" \
   --location "$LOCATION" \
-  --ssh-key "$SSH_KEY_NAME"
+  --ssh-key "$SSH_KEY_NAME" \
+  --user-data-from-file "$USERDATA"
 
 IP=$(hcloud server ip "$SERVER_NAME")
 success "Server created at $IP"
 
-# --- Wait for SSH ---
-info "Waiting for SSH to become available..."
-for i in $(seq 1 30); do
-  if ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@"$IP" true 2>/dev/null; then
-    break
-  fi
-  if [ "$i" -eq 30 ]; then
-    error "SSH never became available"
-  fi
-  sleep 2
-done
-success "SSH is ready"
-
-# --- Run setup ---
-info "Running setup script from $SETUP_URL..."
-ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no root@"$IP" \
-  "curl -fsSL '$SETUP_URL' | TAILSCALE_AUTHKEY='$TAILSCALE_AUTHKEY' DISCORD_WEBHOOK_URL='$DISCORD_WEBHOOK_URL' bash"
+# --- Notify Discord ---
+curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+  -H "Content-Type: application/json" \
+  -d "{\"embeds\": [{\"title\": \"$SERVER_NAME - provisioning\", \"description\": \"Server created at \`$IP\` ($SERVER_TYPE, $LOCATION). Cloud-init setup starting...\", \"color\": 3447003}]}" >/dev/null 2>&1 || true
+success "Discord notified - follow progress there"
 
 # --- SSH config ---
 info "Adding SSH config entry..."
@@ -116,11 +119,11 @@ fi
 
 # --- Done ---
 echo ""
-success "Server '$SERVER_NAME' is ready!"
+success "Server '$SERVER_NAME' provisioned!"
 echo ""
 echo "  Public IP:    $IP"
-echo "  SSH:          ssh $SERVER_NAME  (via Tailscale)"
+echo "  SSH:          ssh $SERVER_NAME  (via Tailscale, once setup finishes)"
 echo ""
-echo "  Port 22 is closed. Access is Tailscale-only."
-echo "  Reboot the server to apply all kernel settings:"
+echo "  Setup is running via cloud-init - watch Discord for progress."
+echo "  Once complete, reboot to apply all kernel settings:"
 echo "    hcloud server reboot $SERVER_NAME"

@@ -20,28 +20,54 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-info()    { echo -e "${YELLOW}=> $1${NC}"; }
-success() { echo -e "${GREEN}=> $1${NC}"; }
-error()   { echo -e "${RED}=> ERROR: $1${NC}" >&2; exit 1; }
-
-# Discord notification (available before server-notify is installed)
 discord() {
   local color="${2:-3447003}"
-  curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+  curl -s -X POST "${DISCORD_WEBHOOK_URL:-}" \
     -H "Content-Type: application/json" \
-    -d "{\"embeds\": [{\"title\": \"$(hostname) — provisioning\", \"description\": \"$1\", \"color\": $color}]}" >/dev/null 2>&1 || true
+    -d "{\"embeds\": [{\"title\": \"$(hostname) - provisioning\", \"description\": \"$1\", \"color\": $color}]}" >/dev/null 2>&1 || true
 }
 
-handle_error() {
-  discord "Setup failed on line $1" 16711680
-  error "Script failed on line $1"
+info()    { echo "$1" > "$HEARTBEAT_FILE"; echo -e "${YELLOW}=> $1${NC}"; discord "$1"; }
+success() { echo -e "${GREEN}=> $1${NC}"; discord "$1" 3066993; }
+error()   { echo -e "${RED}=> ERROR: $1${NC}" >&2; discord "$1" 16711680; exit 1; }
+
+SETUP_COMPLETED=false
+HEARTBEAT_FILE=$(mktemp)
+echo "starting" > "$HEARTBEAT_FILE"
+
+# --- Heartbeat ---
+# Sends a "still working..." message every 30s so you know the script is alive
+heartbeat() {
+  while true; do
+    sleep 30
+    discord "Still working on: $(cat "$HEARTBEAT_FILE")..."
+  done
 }
-trap 'handle_error ${LINENO}' ERR
+heartbeat &
+HEARTBEAT_PID=$!
+
+handle_exit() {
+  kill "$HEARTBEAT_PID" 2>/dev/null || true
+  if [ "$SETUP_COMPLETED" = false ]; then
+    discord "Setup did not complete successfully.\nLast step: $(cat "$HEARTBEAT_FILE")\nCheck logs: \`cat /var/log/cloud-init-output.log\`" 16711680
+  fi
+  rm -f "$HEARTBEAT_FILE"
+}
+trap handle_exit EXIT
+
+handle_error() {
+  local line="$1"
+  local cmd="$2"
+  discord "Setup failed at line $line\n\`\`\`\n$cmd\n\`\`\`\nLast step: $(cat "$HEARTBEAT_FILE")\nCheck logs: \`cat /var/log/cloud-init-output.log\`" 16711680
+  error "Script failed at line $line: $cmd"
+}
+trap 'handle_error ${LINENO} "$BASH_COMMAND"' ERR
 
 # --- Pre-flight Checks ---
 info "Running pre-flight checks..."
 
 [[ $EUID -eq 0 ]] || error "Must run as root"
+command -v curl >/dev/null || { apt-get update && apt-get install -y curl; }
 
 os_name=$(lsb_release -is 2>/dev/null) || error "lsb_release not found"
 os_version=$(lsb_release -rs)
@@ -56,7 +82,7 @@ total_disk_gb=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
 [[ -n "${TAILSCALE_AUTHKEY:-}" ]] || error "TAILSCALE_AUTHKEY env var is required"
 [[ -n "${DISCORD_WEBHOOK_URL:-}" ]] || error "DISCORD_WEBHOOK_URL env var is required"
 
-discord "Provisioning started — updating system packages..."
+info "Provisioning started"
 
 # --- System Updates ---
 info "Updating system packages..."
@@ -98,7 +124,7 @@ systemctl enable chrony.service
 systemctl start chrony.service
 
 # --- System Hardening ---
-info "Hardening system..."
+info "Hardening system (AppArmor, AIDE, sysctl)..."
 
 systemctl enable apparmor
 systemctl start apparmor
@@ -169,7 +195,6 @@ cat <<EOF > /etc/security/limits.d/docker.conf
 *       hard    stack     8192
 EOF
 
-discord "System hardened — installing Docker..."
 
 # --- Docker ---
 info "Installing Docker..."
@@ -234,7 +259,6 @@ fi
 chown -R docker:docker /home/docker
 chmod 755 /home/docker
 
-discord "Docker ready — installing Tailscale..."
 
 # --- Tailscale ---
 info "Installing Tailscale..."
@@ -242,7 +266,6 @@ curl -fsSL https://tailscale.com/install.sh | sh
 tailscale up --authkey="$TAILSCALE_AUTHKEY" --ssh
 success "Tailscale is up"
 
-discord "Tailscale connected — configuring firewall & SSH..."
 
 # --- Firewall ---
 # Tailscale is up, so we can safely lock out port 22
@@ -263,7 +286,6 @@ Include /etc/ssh/sshd_config.d/*.conf
 
 Port 22
 AddressFamily inet
-Protocol 2
 
 HostKey /etc/ssh/ssh_host_ed25519_key
 HostKey /etc/ssh/ssh_host_ecdsa_key
@@ -283,7 +305,7 @@ HostbasedAuthentication no
 IgnoreRhosts yes
 PasswordAuthentication no
 PermitEmptyPasswords no
-ChallengeResponseAuthentication no
+KbdInteractiveAuthentication no
 
 UsePAM yes
 AllowAgentForwarding no
@@ -303,10 +325,12 @@ Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.
 MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com
 EOF
 
-systemctl reload sshd
+sshd -t || error "sshd config validation failed"
+systemctl enable ssh
+systemctl restart ssh
 
 # --- fail2ban ---
-info "Configuring fail2ban..."
+info "Configuring fail2ban, auditd, logging..."
 cat <<EOF > /etc/fail2ban/jail.local
 [DEFAULT]
 bantime = 3600
@@ -361,7 +385,7 @@ EOF
 chmod +x /etc/cron.daily/docker-cleanup
 
 # --- Discord Webhook ---
-info "Configuring Discord notifications..."
+info "Setting up maintenance tasks & monitoring..."
 echo "$DISCORD_WEBHOOK_URL" > /etc/server-discord-webhook
 chmod 600 /etc/server-discord-webhook
 
@@ -429,7 +453,7 @@ fi
 SCRIPT
 
 # --- Automatic Security Updates ---
-info "Configuring automatic updates..."
+info "Configuring automatic security updates..."
 cat <<EOF > /etc/apt/apt.conf.d/50unattended-upgrades
 Unattended-Upgrade::Allowed-Origins {
     "\${distro_id}:\${distro_codename}-security";
@@ -463,4 +487,5 @@ echo ""
 echo "  IMPORTANT: Reboot the server to apply all kernel settings"
 echo "  Port 22 is NOT open. SSH access is Tailscale-only."
 
+SETUP_COMPLETED=true
 discord "Setup complete! Docker $(docker --version | awk '{print $3}' | tr -d ','), Tailscale $(tailscale version | head -1). Reboot to apply kernel settings." 3066993
