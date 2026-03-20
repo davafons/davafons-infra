@@ -145,6 +145,15 @@ else
 fi
 log "Tailscale is up — remote access secured" green
 
+# Export Tailscale IP system-wide (for Docker compose port bindings)
+TAILSCALE_IP="$(tailscale ip -4)"
+if grep -q '^TAILSCALE_IP=' /etc/environment 2>/dev/null; then
+  sed -i "s/^TAILSCALE_IP=.*/TAILSCALE_IP=${TAILSCALE_IP}/" /etc/environment
+else
+  echo "TAILSCALE_IP=${TAILSCALE_IP}" >> /etc/environment
+fi
+log "Tailscale IP (${TAILSCALE_IP}) written to /etc/environment"
+
 # --- Essential Packages ---
 log "Installing essential packages..."
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
