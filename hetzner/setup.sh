@@ -26,10 +26,10 @@ else
   mkdir -p "$BASE_DIR/scripts" "$BASE_DIR/config"
 
   for f in server-notify server-status docker-cleanup login-notify update-cloudflare-ips security-audit aide-check; do
-    curl -fsSL "$SETUP_BASE_URL/scripts/$f" -o "$BASE_DIR/scripts/$f"
+    curl -fsSL "$SETUP_BASE_URL/scripts/$f" -o "$BASE_DIR/scripts/$f" || { echo "Failed to download scripts/$f"; exit 1; }
   done
   for f in daemon.json jail.local audit.rules sysctl-security.conf docker-limits.conf docker-logrotate.conf unattended-upgrades.conf kernel-modules-blacklist.conf sudoers-hardening coredump.conf pwquality.conf issue; do
-    curl -fsSL "$SETUP_BASE_URL/config/$f" -o "$BASE_DIR/config/$f"
+    curl -fsSL "$SETUP_BASE_URL/config/$f" -o "$BASE_DIR/config/$f" || { echo "Failed to download config/$f"; exit 1; }
   done
 fi
 

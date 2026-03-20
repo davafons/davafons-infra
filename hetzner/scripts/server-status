@@ -27,6 +27,7 @@ mem_num=$(echo "$mem_pct" | tr -d '%')
 docker info &>/dev/null || warnings+="Docker is not running!\n"
 systemctl is-active --quiet tailscaled || warnings+="Tailscale is not running!\n"
 systemctl is-active --quiet fail2ban || warnings+="fail2ban is not running!\n"
+[[ -f /var/run/reboot-required ]] && warnings+="Reboot required ($(cat /var/run/reboot-required.pkgs 2>/dev/null | tr '\n' ' ' || echo 'unknown packages'))\n"
 
 if [ -n "$warnings" ]; then
   report+="\n**Warnings:**\n$warnings"
