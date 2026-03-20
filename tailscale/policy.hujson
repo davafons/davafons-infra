@@ -7,17 +7,17 @@
 	},
 
 	"tagOwners": {
-		"tag:nadeshiko":   ["autogroup:owner"],
-		"tag:wariwari":    ["autogroup:owner"],
-		"tag:monitoring":  ["autogroup:owner"],
-		"tag:qtower":        ["autogroup:owner"],
-		"tag:ci":          ["autogroup:owner"],
+		"tag:nadeshiko":   ["autogroup:admin"],
+		"tag:wariwari":    ["autogroup:admin"],
+		"tag:monitoring":  ["autogroup:admin"],
+		"tag:qtower":        ["autogroup:admin"],
+		"tag:ci":          ["autogroup:admin"],
 	},
 
 	"grants": [
 		// Admin (you) can access everything
 		{
-			"src": ["autogroup:owner"],
+			"src": ["autogroup:admin"],
 			"dst": ["*"],
 			"ip":  ["*"],
 		},
@@ -61,7 +61,7 @@
 		// Only davafons can SSH into all servers (browser re-auth required)
 		{
 			"action": "check",
-			"src":    ["autogroup:owner"],
+			"src":    ["autogroup:admin"],
 			"dst":    ["autogroup:tagged"],
 			"users":  ["root", "autogroup:nonroot"],
 		},
@@ -86,7 +86,7 @@
 	"tests": [
 		// Admin can reach everything
 		{
-			"src":    "autogroup:owner",
+			"src":    "davafons@gmail.com",
 			"accept": ["tag:nadeshiko:443", "tag:wariwari:443", "tag:monitoring:443", "tag:qtower:443"],
 		},
 		// Nadeshiko user can only reach nadeshiko
