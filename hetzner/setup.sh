@@ -14,7 +14,25 @@ REQUIRED_VERSION="24.04"
 MIN_RAM_MB=1024
 MIN_DISK_GB=20
 
-BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
+SETUP_BASE_URL="https://setup.davafons.cc/hetzner"
+
+# When run from the repo, use local files. When run via curl, download them.
+if [[ -f "$(dirname "$0")/scripts/server-notify" ]]; then
+  BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
+else
+  BASE_DIR=$(mktemp -d)
+  CLEANUP_BASE_DIR=true
+
+  mkdir -p "$BASE_DIR/scripts" "$BASE_DIR/config"
+
+  for f in server-notify server-health-check docker-cleanup login-notify update-cloudflare-ips; do
+    curl -fsSL "$SETUP_BASE_URL/scripts/$f" -o "$BASE_DIR/scripts/$f"
+  done
+  for f in daemon.json jail.local audit.rules sysctl-security.conf docker-limits.conf docker-logrotate.conf unattended-upgrades.conf; do
+    curl -fsSL "$SETUP_BASE_URL/config/$f" -o "$BASE_DIR/config/$f"
+  done
+fi
+
 SCRIPT_DIR="$BASE_DIR/scripts"
 CONFIG_DIR="$BASE_DIR/config"
 
@@ -49,6 +67,7 @@ handle_exit() {
     log "Setup did not complete successfully.\nLast step: $(cat "$HEARTBEAT_FILE")\nCheck logs: \`cat /var/log/cloud-init-output.log\`" red
   fi
   rm -f "$HEARTBEAT_FILE"
+  [[ "${CLEANUP_BASE_DIR:-}" == true ]] && rm -rf "$BASE_DIR" || true
 }
 trap handle_exit EXIT
 
@@ -59,7 +78,7 @@ trap 'echo -e "\033[0;31m=> ERROR: Script failed at line ${LINENO}: $BASH_COMMAN
 log "Running pre-flight checks..."
 
 [[ $EUID -eq 0 ]] || die "Must run as root"
-command -v curl >/dev/null || { apt-get update && apt-get install -y curl; }
+command -v curl >/dev/null && command -v jq >/dev/null || { apt-get update && apt-get install -y curl jq; }
 
 # Load secrets from tmpfs (cloud-init) or env vars (manual run)
 SECRETS_FILE="/run/setup-secrets"
@@ -83,7 +102,7 @@ if ! command -v tailscale >/dev/null || ! tailscale status >/dev/null 2>&1; then
   [[ -n "${TAILSCALE_AUTHKEY:-}" ]] || die "TAILSCALE_AUTHKEY is required on first run (set env var or /run/setup-secrets)"
 fi
 
-[[ -n "${DISCORD_WEBHOOK_URL:-}" ]] || { echo -e "\033[0;31m=> ERROR: DISCORD_WEBHOOK_URL is required (set env var or /run/setup-secrets)\033[0m" >&2; exit 1; }
+[[ -n "${DISCORD_WEBHOOK_URL:-}" ]] || die "DISCORD_WEBHOOK_URL is required (set env var or /run/setup-secrets)"
 
 # Install server-notify early so all setup messages go through it
 echo "$DISCORD_WEBHOOK_URL" > /etc/server-discord-webhook
@@ -127,6 +146,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     apparmor-utils \
     aide \
     rkhunter \
+    jq \
     git
 
 # --- Time Synchronization ---
@@ -204,7 +224,7 @@ ufw --force enable
 # Allow HTTP/HTTPS only from Cloudflare IP ranges
 log "Configuring Cloudflare-only HTTP/HTTPS access..."
 install -m 755 "$SCRIPT_DIR/update-cloudflare-ips" /usr/local/bin/update-cloudflare-ips
-install -m 755 "$SCRIPT_DIR/update-cloudflare-ips" /etc/cron.weekly/update-cloudflare-ips
+ln -sf /usr/local/bin/update-cloudflare-ips /etc/cron.weekly/update-cloudflare-ips
 /usr/local/bin/update-cloudflare-ips
 
 # --- Disable OpenSSH (Tailscale SSH handles all access) ---
@@ -222,9 +242,11 @@ install -m 644 "$CONFIG_DIR/unattended-upgrades.conf" /etc/apt/apt.conf.d/50unat
 
 # --- Scripts ---
 log "Installing scripts..."
-install -m 755 "$SCRIPT_DIR/docker-cleanup" /etc/cron.daily/docker-cleanup
-install -m 755 "$SCRIPT_DIR/server-health-check" /etc/cron.daily/server-health-check
-install -m 644 "$SCRIPT_DIR/login-notify.sh" /etc/profile.d/login-notify.sh
+install -m 755 "$SCRIPT_DIR/docker-cleanup" /usr/local/bin/docker-cleanup
+install -m 755 "$SCRIPT_DIR/server-health-check" /usr/local/bin/server-health-check
+ln -sf /usr/local/bin/docker-cleanup /etc/cron.daily/docker-cleanup
+ln -sf /usr/local/bin/server-health-check /etc/cron.daily/server-health-check
+install -m 644 "$SCRIPT_DIR/login-notify" /etc/profile.d/login-notify.sh
 
 # --- Enable Services ---
 log "Starting services..."
@@ -249,7 +271,7 @@ echo "  Port 22 is NOT open. SSH access is Tailscale-only."
 
 # --- Verify health check works ---
 log "Running health check test..."
-/etc/cron.daily/server-health-check
+server-health-check
 
 SETUP_COMPLETED=true
 log "Setup complete! Docker $(docker --version | awk '{print $3}' | tr -d ','), Tailscale $(tailscale version | head -1). Reboot to apply kernel settings." green

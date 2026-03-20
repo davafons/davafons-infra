@@ -1,16 +1,19 @@
 #!/bin/bash
+set -euo pipefail
+
 WEBHOOK_URL=$(cat /etc/server-discord-webhook)
 HOSTNAME=$(hostname)
 COLOR="${2:-3447003}"
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
+# Build JSON safely using jq to avoid injection from message content
+PAYLOAD=$(jq -nc \
+  --arg desc "$1" \
+  --arg ts "$TIMESTAMP" \
+  --arg host "$HOSTNAME" \
+  --argjson color "$COLOR" \
+  '{embeds: [{description: $desc, color: $color, timestamp: $ts, footer: {text: $host}}]}')
+
 curl -s -X POST "$WEBHOOK_URL" \
   -H "Content-Type: application/json" \
-  -d "{
-    \"embeds\": [{
-      \"description\": \"$1\",
-      \"color\": $COLOR,
-      \"timestamp\": \"$TIMESTAMP\",
-      \"footer\": {\"text\": \"$HOSTNAME\"}
-    }]
-  }"
+  -d "$PAYLOAD"

@@ -1,3 +1,5 @@
 #!/bin/bash
+set -euo pipefail
+
 docker system prune -af --filter "until=72h"
 docker builder prune -af --keep-storage=20GB

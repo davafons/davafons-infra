@@ -1,4 +1,6 @@
 #!/bin/bash
+set -uo pipefail
+
 report=""
 
 # Check fail2ban bans (if any jails are active)

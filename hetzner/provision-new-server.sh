@@ -101,7 +101,7 @@ PROMETHEUS_REMOTE_WRITE_URL='$PROMETHEUS_REMOTE_WRITE_URL'
 LOKI_URL='$LOKI_URL'
 SECRETS
 
-# Download and run setup script
+# Download and run setup script (it downloads its own dependencies)
 SETUP_SCRIPT=\$(mktemp)
 curl -fsSL '$SETUP_URL' -o "\$SETUP_SCRIPT" || { notify_error "Failed to download setup script from $SETUP_URL"; exit 1; }
 bash "\$SETUP_SCRIPT"

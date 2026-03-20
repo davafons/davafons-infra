@@ -4,11 +4,17 @@
 
 set -euo pipefail
 
+# Fetch first — if this fails, existing rules are preserved
 CF_IPV4=$(curl -sf https://www.cloudflare.com/ips-v4) || { echo "Failed to fetch Cloudflare IPv4 ranges" >&2; exit 1; }
 CF_IPV6=$(curl -sf https://www.cloudflare.com/ips-v6) || { echo "Failed to fetch Cloudflare IPv6 ranges" >&2; exit 1; }
 
-# Remove existing Cloudflare rules (identified by comment)
-ufw status numbered | grep "Cloudflare" | awk -F'[][]' '{print $2}' | sort -rn | while read -r num; do
+# Sanity check — Cloudflare should have at least 10 ranges
+ipv4_count=$(echo "$CF_IPV4" | wc -l)
+ipv6_count=$(echo "$CF_IPV6" | wc -l)
+(( ipv4_count >= 10 )) || { echo "Suspiciously few IPv4 ranges ($ipv4_count), aborting" >&2; exit 1; }
+
+# Remove existing Cloudflare rules (identified by comment), in reverse order
+for num in $(ufw status numbered | grep "Cloudflare" | awk -F'[][]' '{print $2}' | sort -rn); do
   ufw --force delete "$num"
 done
 
@@ -17,4 +23,4 @@ for ip in $CF_IPV4 $CF_IPV6; do
   ufw allow from "$ip" to any port 80,443 proto tcp comment "Cloudflare"
 done
 
-echo "Cloudflare UFW rules updated ($(echo "$CF_IPV4" | wc -l) IPv4 + $(echo "$CF_IPV6" | wc -l) IPv6 ranges)"
+echo "Cloudflare UFW rules updated ($ipv4_count IPv4 + $ipv6_count IPv6 ranges)"
