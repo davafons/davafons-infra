@@ -128,6 +128,23 @@ log "Updating system packages..."
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 
+# --- Tailscale (first, to guarantee remote access) ---
+if ! command -v tailscale >/dev/null; then
+  log "Installing Tailscale..."
+  curl -fsSL https://tailscale.com/install.sh | sh
+else
+  log "Tailscale already installed, skipping installation"
+fi
+
+if tailscale status >/dev/null 2>&1; then
+  log "Tailscale already connected, ensuring SSH is enabled"
+  tailscale set --ssh
+else
+  log "Connecting to Tailscale..."
+  tailscale up --authkey="$TAILSCALE_AUTHKEY" --ssh
+fi
+log "Tailscale is up — remote access secured" green
+
 # --- Essential Packages ---
 log "Installing essential packages..."
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -157,6 +174,9 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
 
 # --- Time Synchronization ---
 log "Configuring time synchronization..."
+# Recover from any broken dpkg state (needrestart hooks can leave things dirty)
+dpkg --configure -a
+apt-get install -f -y
 systemctl stop systemd-timesyncd 2>/dev/null || true
 systemctl disable systemd-timesyncd 2>/dev/null || true
 apt-get remove -y systemd-timesyncd 2>/dev/null || true
@@ -266,23 +286,6 @@ fi
 usermod -aG docker docker
 chown -R docker:docker /home/docker
 chmod 750 /home/docker
-
-# --- Tailscale ---
-if ! command -v tailscale >/dev/null; then
-  log "Installing Tailscale..."
-  curl -fsSL https://tailscale.com/install.sh | sh
-else
-  log "Tailscale already installed, skipping installation"
-fi
-
-if tailscale status >/dev/null 2>&1; then
-  log "Tailscale already connected, ensuring SSH is enabled"
-  tailscale set --ssh
-else
-  log "Connecting to Tailscale..."
-  tailscale up --authkey="$TAILSCALE_AUTHKEY" --ssh
-fi
-log "Tailscale is up" green
 
 # --- Firewall ---
 # Tailscale is up, so we can safely lock out port 22
