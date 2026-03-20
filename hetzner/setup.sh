@@ -24,7 +24,18 @@ info()    { echo -e "${YELLOW}=> $1${NC}"; }
 success() { echo -e "${GREEN}=> $1${NC}"; }
 error()   { echo -e "${RED}=> ERROR: $1${NC}" >&2; exit 1; }
 
-handle_error() { error "Script failed on line $1"; }
+# Discord notification (available before server-notify is installed)
+discord() {
+  local color="${2:-3447003}"
+  curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+    -H "Content-Type: application/json" \
+    -d "{\"embeds\": [{\"title\": \"$(hostname) — provisioning\", \"description\": \"$1\", \"color\": $color}]}" >/dev/null 2>&1 || true
+}
+
+handle_error() {
+  discord "Setup failed on line $1" 16711680
+  error "Script failed on line $1"
+}
 trap 'handle_error ${LINENO}' ERR
 
 # --- Pre-flight Checks ---
@@ -43,6 +54,9 @@ total_disk_gb=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
 (( total_disk_gb >= MIN_DISK_GB )) || error "Need ${MIN_DISK_GB}GB disk, found ${total_disk_gb}GB"
 
 [[ -n "${TAILSCALE_AUTHKEY:-}" ]] || error "TAILSCALE_AUTHKEY env var is required"
+[[ -n "${DISCORD_WEBHOOK_URL:-}" ]] || error "DISCORD_WEBHOOK_URL env var is required"
+
+discord "Provisioning started — updating system packages..."
 
 # --- System Updates ---
 info "Updating system packages..."
@@ -91,6 +105,8 @@ systemctl start apparmor
 
 aide --config=/etc/aide/aide.conf --init
 mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+
+rkhunter --propupd
 
 cat <<EOF > /etc/sysctl.d/99-security.conf
 # Network security
@@ -152,6 +168,8 @@ cat <<EOF > /etc/security/limits.d/docker.conf
 *       soft    stack     8192
 *       hard    stack     8192
 EOF
+
+discord "System hardened — installing Docker..."
 
 # --- Docker ---
 info "Installing Docker..."
@@ -216,11 +234,15 @@ fi
 chown -R docker:docker /home/docker
 chmod 755 /home/docker
 
+discord "Docker ready — installing Tailscale..."
+
 # --- Tailscale ---
 info "Installing Tailscale..."
 curl -fsSL https://tailscale.com/install.sh | sh
 tailscale up --authkey="$TAILSCALE_AUTHKEY" --ssh
 success "Tailscale is up"
+
+discord "Tailscale connected — configuring firewall & SSH..."
 
 # --- Firewall ---
 # Tailscale is up, so we can safely lock out port 22
@@ -338,6 +360,74 @@ docker builder prune -af --keep-storage=20GB
 EOF
 chmod +x /etc/cron.daily/docker-cleanup
 
+# --- Discord Webhook ---
+info "Configuring Discord notifications..."
+echo "$DISCORD_WEBHOOK_URL" > /etc/server-discord-webhook
+chmod 600 /etc/server-discord-webhook
+
+cat <<'SCRIPT' > /usr/local/bin/server-notify
+#!/bin/bash
+WEBHOOK_URL=$(cat /etc/server-discord-webhook)
+HOSTNAME=$(hostname)
+COLOR="${2:-3447003}"
+
+curl -s -X POST "$WEBHOOK_URL" \
+  -H "Content-Type: application/json" \
+  -d "{\"embeds\": [{\"title\": \"$HOSTNAME\", \"description\": \"$1\", \"color\": $COLOR}]}"
+SCRIPT
+chmod +x /usr/local/bin/server-notify
+
+# --- Daily Health Check ---
+info "Setting up daily health check..."
+cat <<'SCRIPT' > /etc/cron.daily/server-health-check
+#!/bin/bash
+report=""
+
+# Check fail2ban bans
+bans=$(fail2ban-client status sshd 2>/dev/null | grep "Currently banned" | awk '{print $NF}')
+[[ "$bans" != "0" ]] && report+="**fail2ban:** $bans IPs currently banned\n"
+
+# Check AIDE file integrity
+aide_output=$(aide --check 2>&1)
+if [ $? -ne 0 ]; then
+  changes=$(echo "$aide_output" | grep -E "changed|added|removed" | head -5)
+  report+="**AIDE:** file integrity changes detected\n$changes\n"
+fi
+
+# Check rkhunter
+rkhunter_output=$(rkhunter --check --skip-keypress --report-warnings-only 2>&1)
+if [ -n "$rkhunter_output" ]; then
+  report+="**rkhunter:** warnings found\n"
+fi
+
+# Check disk usage
+disk_pct=$(df / | awk 'NR==2 {print $5}' | tr -d '%')
+(( disk_pct > 80 )) && report+="**Disk:** ${disk_pct}% used\n"
+
+# Check memory
+mem_pct=$(free | awk '/^Mem:/ {printf "%.0f", $3/$2 * 100}')
+(( mem_pct > 90 )) && report+="**Memory:** ${mem_pct}% used\n"
+
+# Check Docker
+if ! docker info &>/dev/null; then
+  report+="**Docker:** not running!\n"
+fi
+
+# Only notify if something needs attention
+if [ -n "$report" ]; then
+  /usr/local/bin/server-notify "$(echo -e "$report")" 16711680
+fi
+SCRIPT
+chmod +x /etc/cron.daily/server-health-check
+
+# --- SSH Login Notification ---
+info "Setting up SSH login notifications..."
+cat <<'SCRIPT' > /etc/profile.d/login-notify.sh
+if [ -n "$SSH_CLIENT" ]; then
+  /usr/local/bin/server-notify "SSH login: $(whoami) from ${SSH_CLIENT%% *}" 3447003 &>/dev/null &
+fi
+SCRIPT
+
 # --- Automatic Security Updates ---
 info "Configuring automatic updates..."
 cat <<EOF > /etc/apt/apt.conf.d/50unattended-upgrades
@@ -372,3 +462,5 @@ echo "  fail2ban:   $(fail2ban-client status 2>/dev/null | grep 'Number of jail:
 echo ""
 echo "  IMPORTANT: Reboot the server to apply all kernel settings"
 echo "  Port 22 is NOT open. SSH access is Tailscale-only."
+
+discord "Setup complete! Docker $(docker --version | awk '{print $3}' | tr -d ','), Tailscale $(tailscale version | head -1). Reboot to apply kernel settings." 3066993

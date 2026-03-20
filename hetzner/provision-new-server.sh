@@ -53,6 +53,13 @@ echo ""
 read -rp "Tailscale auth key: " TAILSCALE_AUTHKEY
 [ -n "$TAILSCALE_AUTHKEY" ] || error "Tailscale auth key is required"
 
+echo ""
+echo "Discord webhook URL for server notifications."
+echo "Create one at: Channel Settings > Integrations > Webhooks"
+echo ""
+read -rp "Discord webhook URL: " DISCORD_WEBHOOK_URL
+[ -n "$DISCORD_WEBHOOK_URL" ] || error "Discord webhook URL is required"
+
 # --- Check for existing server ---
 if hcloud server describe "$SERVER_NAME" >/dev/null 2>&1; then
   error "Server '$SERVER_NAME' already exists. Delete it first: hcloud server delete $SERVER_NAME"
@@ -86,7 +93,7 @@ success "SSH is ready"
 # --- Run setup ---
 info "Running setup script from $SETUP_URL..."
 ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no root@"$IP" \
-  "curl -fsSL '$SETUP_URL' | TAILSCALE_AUTHKEY='$TAILSCALE_AUTHKEY' bash"
+  "curl -fsSL '$SETUP_URL' | TAILSCALE_AUTHKEY='$TAILSCALE_AUTHKEY' DISCORD_WEBHOOK_URL='$DISCORD_WEBHOOK_URL' bash"
 
 # --- SSH config ---
 info "Adding SSH config entry..."
