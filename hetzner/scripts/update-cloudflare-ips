@@ -14,7 +14,7 @@ ipv6_count=$(echo "$CF_IPV6" | wc -l)
 (( ipv4_count >= 10 )) || { echo "Suspiciously few IPv4 ranges ($ipv4_count), aborting" >&2; exit 1; }
 
 # Compare with existing rules and only apply the diff (avoids downtime)
-existing_ips=$(ufw status | grep "Cloudflare" | awk '{print $3}' | sort)
+existing_ips=$(ufw status | grep "Cloudflare" | awk '{print $3}' | sort || true)
 desired_ips=$(printf '%s\n' $CF_IPV4 $CF_IPV6 | sort)
 
 to_add=$(comm -23 <(echo "$desired_ips") <(echo "$existing_ips"))
