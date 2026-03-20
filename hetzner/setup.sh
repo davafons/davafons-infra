@@ -223,12 +223,16 @@ chmod 600 /etc/cron.allow /etc/at.allow
 log "Configuring login banner..."
 DEBIAN_FRONTEND=noninteractive apt-get install -y figlet >/dev/null 2>&1
 {
-  echo ""
   figlet -f slant "$(hostname)" | sed 's/^/  /'
-  echo ""
   cat "$CONFIG_DIR/issue"
-} > /etc/issue
-cp /etc/issue /etc/issue.net
+} | tee /etc/issue /etc/issue.net > /dev/null
+
+# Also add as dynamic MOTD (for Tailscale SSH which doesn't read /etc/issue)
+cat > /etc/update-motd.d/00-banner <<'MOTD'
+#!/bin/bash
+cat /etc/issue
+MOTD
+chmod 755 /etc/update-motd.d/00-banner
 
 # --- Login Defaults (umask, password aging) ---
 log "Configuring login defaults..."
