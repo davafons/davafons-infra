@@ -1,0 +1,5 @@
+# Sudoers hardening (CIS Section 5.3)
+Defaults use_pty
+Defaults logfile="/var/log/sudo.log"
+Defaults timestamp_timeout=5
+Defaults passwd_tries=3

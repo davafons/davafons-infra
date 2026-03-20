@@ -1,0 +1,25 @@
+#!/bin/bash
+# Weekly security audit via Lynis
+# Results saved to /var/log/lynis/ and summary sent to Discord
+set -uo pipefail
+
+mkdir -p /var/log/lynis
+
+lynis audit system --no-colors --quiet --logfile /var/log/lynis/audit.log --report-file /var/log/lynis/report.dat 2>/dev/null
+
+# Parse results
+score=$(grep "hardening_index" /var/log/lynis/report.dat | cut -d= -f2)
+warnings=$(grep -c "^warning\[\]" /var/log/lynis/report.dat || true)
+suggestions=$(grep -c "^suggestion\[\]" /var/log/lynis/report.dat || true)
+
+color="green"
+if (( warnings > 0 )); then
+  color="yellow"
+fi
+if (( warnings > 5 )); then
+  color="red"
+fi
+
+report="**Hardening score:** ${score}/100\n**Warnings:** $warnings\n**Suggestions:** $suggestions\n\nFull report: \`/var/log/lynis/report.dat\`"
+
+/usr/local/bin/server-notify "$report" "$color" "Security Audit"

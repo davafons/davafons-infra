@@ -1,18 +1,28 @@
 #!/bin/bash
+# Usage: server-notify "message" [color] [title]
+# Colors: blue (default), green, red, yellow
 set -euo pipefail
 
 WEBHOOK_URL=$(cat /etc/server-discord-webhook)
 HOSTNAME=$(hostname)
-COLOR="${2:-3447003}"
+TITLE="${3:-}"
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+case "${2:-blue}" in
+  red)    COLOR=16711680 ;;
+  green)  COLOR=3066993 ;;
+  yellow) COLOR=16776960 ;;
+  *)      COLOR=3447003 ;;
+esac
 
 # Build JSON safely using jq to avoid injection from message content
 PAYLOAD=$(jq -nc \
   --arg desc "$1" \
+  --arg title "$TITLE" \
   --arg ts "$TIMESTAMP" \
   --arg host "$HOSTNAME" \
   --argjson color "$COLOR" \
-  '{embeds: [{description: $desc, color: $color, timestamp: $ts, footer: {text: $host}}]}')
+  '{embeds: [{description: $desc, color: $color, timestamp: $ts, footer: {text: $host}} + (if $title != "" then {title: $title} else {} end)]}')
 
 curl -s -X POST "$WEBHOOK_URL" \
   -H "Content-Type: application/json" \

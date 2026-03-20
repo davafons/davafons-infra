@@ -1,0 +1,24 @@
+#!/bin/bash
+# Weekly AIDE integrity check — notifies via Discord on changes
+set -euo pipefail
+
+AIDE_DB="/var/lib/aide/aide.db"
+AIDE_CONF="/etc/aide/aide.conf"
+
+if [[ ! -f "$AIDE_DB" ]]; then
+  server-notify "AIDE database missing — run \`aide --init\` to create it" red "AIDE Check"
+  exit 1
+fi
+
+OUTPUT=$(aide --config="$AIDE_CONF" --check 2>&1) && EXIT_CODE=$? || EXIT_CODE=$?
+
+case $EXIT_CODE in
+  0)
+    # No changes detected — stay silent
+    ;;
+  *)
+    # Extract summary (last few lines with counts)
+    SUMMARY=$(echo "$OUTPUT" | grep -E '(Added|Removed|Changed|Total)' | head -10)
+    server-notify "File integrity changes detected:\n\`\`\`\n${SUMMARY}\n\`\`\`\nRun \`aide --check\` for full details." red "AIDE Check"
+    ;;
+esac

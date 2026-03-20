@@ -120,6 +120,35 @@ loki.process "docker_logs" {
   forward_to = [loki.write.default.receiver]
 }
 
+// --- System logs (auth, syslog) ---
+local.file_match "system_logs" {
+  path_targets = [{
+    __path__ = "/var/log/auth.log",
+    job       = "auth",
+  }, {
+    __path__ = "/var/log/syslog",
+    job       = "syslog",
+  }]
+}
+
+loki.source.file "system_logs" {
+  targets    = local.file_match.system_logs.targets
+  forward_to = [loki.write.default.receiver]
+}
+
+// --- Audit logs ---
+local.file_match "audit_logs" {
+  path_targets = [{
+    __path__ = "/var/log/audit/audit.log",
+    job       = "audit",
+  }]
+}
+
+loki.source.file "audit_logs" {
+  targets    = local.file_match.audit_logs.targets
+  forward_to = [loki.write.default.receiver]
+}
+
 // --- Ship logs to Loki ---
 loki.write "default" {
   endpoint {

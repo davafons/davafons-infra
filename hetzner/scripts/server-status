@@ -1,0 +1,40 @@
+#!/bin/bash
+# Daily server status report — always sends a full snapshot
+set -uo pipefail
+
+uptime_str=$(uptime -p | sed 's/up //')
+disk_pct=$(df / | awk 'NR==2 {print $5}')
+mem_pct=$(free | awk '/^Mem:/ {printf "%.0f%%", $3/$2 * 100}')
+containers=$(docker ps --format '{{.Names}}: {{.Status}}' 2>/dev/null | sort)
+container_count=$(echo "$containers" | grep -c . || true)
+
+report="**Uptime:** $uptime_str\n"
+report+="**Disk:** $disk_pct used\n"
+report+="**Memory:** $mem_pct used\n"
+report+="**Containers:** $container_count running\n"
+
+if [ -n "$containers" ]; then
+  report+="\`\`\`\n$containers\n\`\`\`\n"
+fi
+
+# Warnings
+warnings=""
+
+disk_num=$(echo "$disk_pct" | tr -d '%')
+mem_num=$(echo "$mem_pct" | tr -d '%')
+(( disk_num > 80 )) && warnings+="Disk usage high ($disk_pct)\n"
+(( mem_num > 90 )) && warnings+="Memory usage high ($mem_pct)\n"
+docker info &>/dev/null || warnings+="Docker is not running!\n"
+systemctl is-active --quiet tailscaled || warnings+="Tailscale is not running!\n"
+systemctl is-active --quiet fail2ban || warnings+="fail2ban is not running!\n"
+
+if [ -n "$warnings" ]; then
+  report+="\n**Warnings:**\n$warnings"
+fi
+
+color="green"
+if [ -n "$warnings" ]; then
+  color="red"
+fi
+
+/usr/local/bin/server-notify "$(echo -e "$report")" "$color" "Server Status"
