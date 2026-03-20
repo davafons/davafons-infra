@@ -20,7 +20,7 @@ SETUP_BASE_URL="https://setup.davafons.cc/hetzner"
 if [[ -f "$(dirname "$0")/scripts/server-notify" ]]; then
   BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
 else
-  BASE_DIR=$(mktemp -d)
+  BASE_DIR=$(mktemp -d --tmpdir=/run)
   CLEANUP_BASE_DIR=true
 
   mkdir -p "$BASE_DIR/scripts" "$BASE_DIR/config"
