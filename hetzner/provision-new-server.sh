@@ -12,6 +12,7 @@ LOCATION="${3:-hel1}"
 IMAGE="ubuntu-24.04"
 SSH_KEY_NAME="hetzner-$SERVER_NAME"
 SSH_KEY_PATH="$HOME/.ssh/$SSH_KEY_NAME"
+SETUP_URL="https://setup.davafons.cc/hetzner/setup.sh"
 
 # --- Colors ---
 GREEN='\033[0;32m'
@@ -65,18 +66,18 @@ if hcloud server describe "$SERVER_NAME" >/dev/null 2>&1; then
 fi
 
 # --- Build cloud-init user-data ---
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SETUP_SCRIPT="$SCRIPT_DIR/setup.sh"
-[ -f "$SETUP_SCRIPT" ] || error "setup.sh not found at $SETUP_SCRIPT"
-
 USERDATA=$(mktemp)
 trap "rm -f $USERDATA" EXIT
 cat > "$USERDATA" <<CLOUDINIT
 #!/bin/bash
-export TAILSCALE_AUTHKEY='$TAILSCALE_AUTHKEY'
-export DISCORD_WEBHOOK_URL='$DISCORD_WEBHOOK_URL'
+# Write secrets to tmpfs (RAM only, never written to disk)
+install -m 600 /dev/null /run/setup-secrets
+cat > /run/setup-secrets <<'SECRETS'
+TAILSCALE_AUTHKEY='$TAILSCALE_AUTHKEY'
+DISCORD_WEBHOOK_URL='$DISCORD_WEBHOOK_URL'
+SECRETS
 
-$(cat "$SETUP_SCRIPT")
+curl -fsSL '$SETUP_URL' | bash
 CLOUDINIT
 
 # --- Create server ---

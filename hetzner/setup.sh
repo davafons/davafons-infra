@@ -34,20 +34,10 @@ error()   { echo -e "${RED}=> ERROR: $1${NC}" >&2; discord "$1" 16711680; exit 1
 SETUP_COMPLETED=false
 HEARTBEAT_FILE=$(mktemp)
 echo "starting" > "$HEARTBEAT_FILE"
-
-# --- Heartbeat ---
-# Sends a "still working..." message every 30s so you know the script is alive
-heartbeat() {
-  while true; do
-    sleep 30
-    discord "Still working on: $(cat "$HEARTBEAT_FILE")..."
-  done
-}
-heartbeat &
-HEARTBEAT_PID=$!
+HEARTBEAT_PID=""
 
 handle_exit() {
-  kill "$HEARTBEAT_PID" 2>/dev/null || true
+  [[ -n "$HEARTBEAT_PID" ]] && kill "$HEARTBEAT_PID" 2>/dev/null || true
   if [ "$SETUP_COMPLETED" = false ]; then
     discord "Setup did not complete successfully.\nLast step: $(cat "$HEARTBEAT_FILE")\nCheck logs: \`cat /var/log/cloud-init-output.log\`" 16711680
   fi
@@ -59,7 +49,8 @@ handle_error() {
   local line="$1"
   local cmd="$2"
   discord "Setup failed at line $line\n\`\`\`\n$cmd\n\`\`\`\nLast step: $(cat "$HEARTBEAT_FILE")\nCheck logs: \`cat /var/log/cloud-init-output.log\`" 16711680
-  error "Script failed at line $line: $cmd"
+  echo -e "${RED}=> ERROR: Script failed at line $line: $cmd${NC}" >&2
+  exit 1
 }
 trap 'handle_error ${LINENO} "$BASH_COMMAND"' ERR
 
@@ -68,6 +59,13 @@ info "Running pre-flight checks..."
 
 [[ $EUID -eq 0 ]] || error "Must run as root"
 command -v curl >/dev/null || { apt-get update && apt-get install -y curl; }
+
+# Load secrets from tmpfs (cloud-init) or env vars (manual run)
+SECRETS_FILE="/run/setup-secrets"
+if [[ -f "$SECRETS_FILE" ]]; then
+  source "$SECRETS_FILE"
+  rm -f "$SECRETS_FILE"
+fi
 
 os_name=$(lsb_release -is 2>/dev/null) || error "lsb_release not found"
 os_version=$(lsb_release -rs)
@@ -79,8 +77,18 @@ total_disk_gb=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
 (( total_ram_mb >= MIN_RAM_MB )) || error "Need ${MIN_RAM_MB}MB RAM, found ${total_ram_mb}MB"
 (( total_disk_gb >= MIN_DISK_GB )) || error "Need ${MIN_DISK_GB}GB disk, found ${total_disk_gb}GB"
 
-[[ -n "${TAILSCALE_AUTHKEY:-}" ]] || error "TAILSCALE_AUTHKEY env var is required"
-[[ -n "${DISCORD_WEBHOOK_URL:-}" ]] || error "DISCORD_WEBHOOK_URL env var is required"
+[[ -n "${TAILSCALE_AUTHKEY:-}" ]] || error "TAILSCALE_AUTHKEY is required (set env var or /run/setup-secrets)"
+[[ -n "${DISCORD_WEBHOOK_URL:-}" ]] || error "DISCORD_WEBHOOK_URL is required (set env var or /run/setup-secrets)"
+
+# Start heartbeat now that we have the webhook URL
+heartbeat() {
+  while true; do
+    sleep 30
+    discord "Still working on: $(cat "$HEARTBEAT_FILE")..."
+  done
+}
+heartbeat &
+HEARTBEAT_PID=$!
 
 info "Provisioning started"
 
@@ -99,7 +107,6 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     gnupg \
     lsb-release \
     ca-certificates \
-    apt-transport-https \
     software-properties-common \
     sysstat \
     auditd \
@@ -110,9 +117,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     apparmor-utils \
     aide \
     rkhunter \
-    logwatch \
-    git \
-    python3-pyinotify
+    git
 
 # --- Time Synchronization ---
 info "Configuring time synchronization..."
@@ -181,7 +186,6 @@ net.ipv6.conf.all.accept_ra = 0
 net.ipv6.conf.default.accept_ra = 0
 EOF
 
-sysctl -p /etc/sysctl.d/99-security.conf
 sysctl --system
 
 cat <<EOF > /etc/security/limits.d/docker.conf
@@ -194,7 +198,6 @@ cat <<EOF > /etc/security/limits.d/docker.conf
 *       soft    stack     8192
 *       hard    stack     8192
 EOF
-
 
 # --- Docker ---
 info "Installing Docker..."
@@ -259,13 +262,11 @@ fi
 chown -R docker:docker /home/docker
 chmod 755 /home/docker
 
-
 # --- Tailscale ---
 info "Installing Tailscale..."
 curl -fsSL https://tailscale.com/install.sh | sh
 tailscale up --authkey="$TAILSCALE_AUTHKEY" --ssh
 success "Tailscale is up"
-
 
 # --- Firewall ---
 # Tailscale is up, so we can safely lock out port 22
@@ -282,8 +283,6 @@ ufw --force enable
 # --- SSH Hardening ---
 info "Hardening SSH..."
 cat <<EOF > /etc/ssh/sshd_config
-Include /etc/ssh/sshd_config.d/*.conf
-
 Port 22
 AddressFamily inet
 
@@ -376,7 +375,7 @@ cat <<EOF > /etc/logrotate.d/docker-logs
 EOF
 
 # --- Maintenance ---
-info "Setting up maintenance tasks..."
+info "Setting up maintenance tasks & monitoring..."
 cat <<EOF > /etc/cron.daily/docker-cleanup
 #!/bin/bash
 docker system prune -af --filter "until=72h"
@@ -385,7 +384,6 @@ EOF
 chmod +x /etc/cron.daily/docker-cleanup
 
 # --- Discord Webhook ---
-info "Setting up maintenance tasks & monitoring..."
 echo "$DISCORD_WEBHOOK_URL" > /etc/server-discord-webhook
 chmod 600 /etc/server-discord-webhook
 
@@ -475,8 +473,6 @@ apt-get clean
 
 # --- Done ---
 echo ""
-success "Setup complete!"
-echo ""
 echo "  Docker:     $(docker --version)"
 echo "  Tailscale:  $(tailscale version | head -1)"
 echo "  Kernel:     $(uname -r)"
@@ -487,5 +483,10 @@ echo ""
 echo "  IMPORTANT: Reboot the server to apply all kernel settings"
 echo "  Port 22 is NOT open. SSH access is Tailscale-only."
 
+# --- Verify health check works ---
+info "Running health check test..."
+/etc/cron.daily/server-health-check
+/usr/local/bin/server-notify "Health check test passed" 3066993
+
 SETUP_COMPLETED=true
-discord "Setup complete! Docker $(docker --version | awk '{print $3}' | tr -d ','), Tailscale $(tailscale version | head -1). Reboot to apply kernel settings." 3066993
+success "Setup complete! Docker $(docker --version | awk '{print $3}' | tr -d ','), Tailscale $(tailscale version | head -1). Reboot to apply kernel settings."
