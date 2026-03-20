@@ -1,0 +1,37 @@
+#!/bin/bash
+# Weekly auditd log review — summarizes notable events and sends to Discord
+set -uo pipefail
+
+# Time range: last 7 days
+since=$(date -d "7 days ago" "+%m/%d/%Y")
+
+# Collect summaries from aureport
+auth_events=$(aureport --auth --summary -ts "$since" 2>/dev/null | tail -n +6 | head -10)
+sudo_events=$(aureport -x --summary -ts "$since" 2>/dev/null | grep -E "sudo|su" | head -5)
+failed_logins=$(aureport --login --failed --summary -ts "$since" 2>/dev/null | tail -n +6 | head -5)
+anomalies=$(aureport --anomaly -ts "$since" 2>/dev/null | tail -n +4 | wc -l)
+file_changes=$(ausearch -k auth -k cron -k systemd -k network -k ssh -k packages -k docker -k kernel -ts "$since" 2>/dev/null | grep -c "^type=SYSCALL" || true)
+
+# Build report
+report="**Period:** $since — $(date '+%m/%d/%Y')\n"
+report+="**Tracked file/command events:** $file_changes\n"
+report+="**Anomaly events:** $anomalies\n"
+
+if [ -n "$failed_logins" ]; then
+  report+="\n**Failed logins:**\n\`\`\`\n$failed_logins\n\`\`\`\n"
+fi
+
+if [ -n "$sudo_events" ]; then
+  report+="\n**Sudo/su usage:**\n\`\`\`\n$sudo_events\n\`\`\`\n"
+fi
+
+# Color based on anomalies/failures
+color="green"
+if (( anomalies > 0 || file_changes > 50 )); then
+  color="yellow"
+fi
+if (( anomalies > 10 || file_changes > 200 )); then
+  color="red"
+fi
+
+/usr/local/bin/server-notify "$report" "$color" "Audit Log Report"

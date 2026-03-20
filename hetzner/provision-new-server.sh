@@ -10,8 +10,6 @@ SERVER_NAME="${1:-wariwari-prod}"
 SERVER_TYPE="${2:-cx23}"
 LOCATION="${3:-hel1}"
 IMAGE="ubuntu-24.04"
-SSH_KEY_NAME="hetzner-provisioning"
-SSH_KEY_PATH="$HOME/.ssh/$SSH_KEY_NAME"
 SETUP_BASE_URL="https://setup.davafons.cc/hetzner"
 SETUP_URL="$SETUP_BASE_URL/setup.sh"
 MONITORING_URL="$SETUP_BASE_URL/setup-monitoring.sh"
@@ -29,22 +27,6 @@ error()   { echo -e "${RED}=> ERROR: $1${NC}" >&2; exit 1; }
 # --- Preflight ---
 command -v hcloud >/dev/null || error "hcloud CLI not installed. Run: sudo pacman -S hcloud"
 hcloud server list >/dev/null 2>&1 || error "hcloud not configured. Run: hcloud context create wariwari"
-
-# --- SSH key (shared across all servers, only used for emergency access) ---
-if [ ! -f "$SSH_KEY_PATH" ]; then
-  info "Generating shared provisioning SSH key at $SSH_KEY_PATH"
-  ssh-keygen -t ed25519 -f "$SSH_KEY_PATH" -N "" -C "hetzner-provisioning"
-  success "SSH key created"
-fi
-
-# Ensure key exists in hcloud
-if ! hcloud ssh-key describe "$SSH_KEY_NAME" >/dev/null 2>&1; then
-  info "Uploading SSH key to Hetzner"
-  hcloud ssh-key create --name "$SSH_KEY_NAME" --public-key-from-file "${SSH_KEY_PATH}.pub"
-  success "SSH key uploaded"
-else
-  info "SSH key '$SSH_KEY_NAME' already exists in Hetzner"
-fi
 
 # --- Tailscale auth key ---
 echo ""
@@ -121,7 +103,6 @@ hcloud server create \
   --type "$SERVER_TYPE" \
   --image "$IMAGE" \
   --location "$LOCATION" \
-  --ssh-key "$SSH_KEY_NAME" \
   --user-data-from-file "$USERDATA"
 
 IP=$(hcloud server ip "$SERVER_NAME")

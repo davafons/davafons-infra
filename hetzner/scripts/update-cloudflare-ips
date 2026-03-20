@@ -13,14 +13,24 @@ ipv4_count=$(echo "$CF_IPV4" | wc -l)
 ipv6_count=$(echo "$CF_IPV6" | wc -l)
 (( ipv4_count >= 10 )) || { echo "Suspiciously few IPv4 ranges ($ipv4_count), aborting" >&2; exit 1; }
 
-# Remove existing Cloudflare rules (identified by comment), in reverse order
-for num in $(ufw status numbered | grep "Cloudflare" | awk -F'[][]' '{print $2}' | sort -rn); do
-  ufw --force delete "$num"
-done
+# Compare with existing rules and only apply the diff (avoids downtime)
+existing_ips=$(ufw status | grep "Cloudflare" | awk '{print $3}' | sort)
+desired_ips=$(printf '%s\n' $CF_IPV4 $CF_IPV6 | sort)
 
-# Add rules for each Cloudflare range
-for ip in $CF_IPV4 $CF_IPV6; do
+to_add=$(comm -23 <(echo "$desired_ips") <(echo "$existing_ips"))
+to_remove=$(comm -13 <(echo "$desired_ips") <(echo "$existing_ips"))
+
+# Add new ranges first, then remove stale ones
+for ip in $to_add; do
   ufw allow from "$ip" to any port 80,443 proto tcp comment "Cloudflare"
 done
 
-echo "Cloudflare UFW rules updated ($ipv4_count IPv4 + $ipv6_count IPv6 ranges)"
+# Remove stale ranges in reverse order to preserve rule numbers
+for ip in $to_remove; do
+  num=$(ufw status numbered | grep "$ip" | grep "Cloudflare" | awk -F'[][]' '{print $2}' | head -1)
+  [ -n "$num" ] && ufw --force delete "$num"
+done
+
+added=$(echo "$to_add" | grep -c . || true)
+removed=$(echo "$to_remove" | grep -c . || true)
+echo "Cloudflare UFW rules updated ($ipv4_count IPv4 + $ipv6_count IPv6 ranges, +$added -$removed changes)"

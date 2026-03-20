@@ -25,7 +25,7 @@ else
 
   mkdir -p "$BASE_DIR/scripts" "$BASE_DIR/config"
 
-  for f in server-notify server-status docker-cleanup login-notify update-cloudflare-ips security-audit aide-check; do
+  for f in server-notify server-status docker-cleanup login-notify update-cloudflare-ips security-audit aide-check audit-report; do
     curl -fsSL "$SETUP_BASE_URL/scripts/$f" -o "$BASE_DIR/scripts/$f" || { echo "Failed to download scripts/$f"; exit 1; }
   done
   for f in daemon.json jail.local audit.rules sysctl-security.conf docker-limits.conf docker-logrotate.conf unattended-upgrades.conf kernel-modules-blacklist.conf sudoers-hardening coredump.conf pwquality.conf issue; do
@@ -320,10 +320,11 @@ install -m 644 "$CONFIG_DIR/audit.rules" /etc/audit/rules.d/audit.rules
 install -m 644 "$CONFIG_DIR/docker-logrotate.conf" /etc/logrotate.d/docker-logs
 install -m 644 "$CONFIG_DIR/unattended-upgrades.conf" /etc/apt/apt.conf.d/50unattended-upgrades
 
-# --- Postfix Hardening ---
-log "Hardening Postfix..."
-postconf -e "smtpd_banner = \$myhostname ESMTP"
-postconf -e "disable_vrfy_command = yes"
+# --- Remove Postfix (not needed, Discord handles all notifications) ---
+log "Removing Postfix..."
+systemctl disable postfix 2>/dev/null || true
+systemctl stop postfix 2>/dev/null || true
+apt-get remove -y postfix 2>/dev/null || true
 
 # --- needrestart: auto-restart services after updates ---
 log "Configuring needrestart..."
@@ -343,15 +344,17 @@ install -m 755 "$SCRIPT_DIR/docker-cleanup" /usr/local/bin/docker-cleanup
 install -m 755 "$SCRIPT_DIR/server-status" /usr/local/bin/server-status
 install -m 755 "$SCRIPT_DIR/security-audit" /usr/local/bin/security-audit
 install -m 755 "$SCRIPT_DIR/aide-check" /usr/local/bin/aide-check
+install -m 755 "$SCRIPT_DIR/audit-report" /usr/local/bin/audit-report
 ln -sf /usr/local/bin/docker-cleanup /etc/cron.daily/docker-cleanup
 ln -sf /usr/local/bin/server-status /etc/cron.daily/server-status
 ln -sf /usr/local/bin/aide-check /etc/cron.weekly/aide-check
+ln -sf /usr/local/bin/audit-report /etc/cron.weekly/audit-report
 install -m 644 "$SCRIPT_DIR/login-notify" /etc/profile.d/login-notify.sh
 
 # --- Enable Services ---
 log "Starting services..."
-systemctl enable apparmor chrony docker fail2ban auditd postfix
-systemctl restart apparmor chrony docker fail2ban auditd postfix
+systemctl enable apparmor chrony docker fail2ban auditd
+systemctl restart apparmor chrony docker fail2ban auditd
 
 # --- Cleanup ---
 apt-get autoremove -y
