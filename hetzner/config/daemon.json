@@ -1,0 +1,31 @@
+{
+    "log-driver": "json-file",
+    "log-opts": {
+        "max-size": "10m",
+        "max-file": "3"
+    },
+    "icc": false,
+    "live-restore": true,
+    "userland-proxy": false,
+    "no-new-privileges": true,
+    "default-ulimits": {
+        "nofile": {
+            "Name": "nofile",
+            "Hard": 64000,
+            "Soft": 64000
+        }
+    },
+    "features": {
+        "buildkit": true
+    },
+    "experimental": false,
+    "default-runtime": "runc",
+    "storage-driver": "overlay2",
+    "metrics-addr": "127.0.0.1:9323",
+    "builder": {
+        "gc": {
+            "enabled": true,
+            "defaultKeepStorage": "20GB"
+        }
+    }
+}

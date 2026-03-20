@@ -1,0 +1,16 @@
+#!/bin/bash
+WEBHOOK_URL=$(cat /etc/server-discord-webhook)
+HOSTNAME=$(hostname)
+COLOR="${2:-3447003}"
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+curl -s -X POST "$WEBHOOK_URL" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"embeds\": [{
+      \"description\": \"$1\",
+      \"color\": $COLOR,
+      \"timestamp\": \"$TIMESTAMP\",
+      \"footer\": {\"text\": \"$HOSTNAME\"}
+    }]
+  }"

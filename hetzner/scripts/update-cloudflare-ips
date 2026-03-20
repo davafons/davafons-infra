@@ -1,0 +1,20 @@
+#!/bin/bash
+# Fetch Cloudflare IP ranges and update UFW rules
+# Run periodically (e.g., weekly cron) to keep rules up to date
+
+set -euo pipefail
+
+CF_IPV4=$(curl -sf https://www.cloudflare.com/ips-v4) || { echo "Failed to fetch Cloudflare IPv4 ranges" >&2; exit 1; }
+CF_IPV6=$(curl -sf https://www.cloudflare.com/ips-v6) || { echo "Failed to fetch Cloudflare IPv6 ranges" >&2; exit 1; }
+
+# Remove existing Cloudflare rules (identified by comment)
+ufw status numbered | grep "Cloudflare" | awk -F'[][]' '{print $2}' | sort -rn | while read -r num; do
+  ufw --force delete "$num"
+done
+
+# Add rules for each Cloudflare range
+for ip in $CF_IPV4 $CF_IPV6; do
+  ufw allow from "$ip" to any port 80,443 proto tcp comment "Cloudflare"
+done
+
+echo "Cloudflare UFW rules updated ($(echo "$CF_IPV4" | wc -l) IPv4 + $(echo "$CF_IPV6" | wc -l) IPv6 ranges)"
