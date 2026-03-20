@@ -251,14 +251,6 @@ docker info | grep -E "Cgroup Driver|Storage Driver|Logging Driver"
 info "Creating docker user..."
 adduser --system --group --shell /bin/bash --home /home/docker --disabled-password docker
 usermod -aG docker docker
-
-mkdir -p /home/docker/.ssh
-if [ -f /root/.ssh/authorized_keys ]; then
-    cp /root/.ssh/authorized_keys /home/docker/.ssh/authorized_keys
-    chown -R docker:docker /home/docker/.ssh
-    chmod 700 /home/docker/.ssh
-    chmod 600 /home/docker/.ssh/authorized_keys
-fi
 chown -R docker:docker /home/docker
 chmod 755 /home/docker
 
@@ -280,53 +272,10 @@ ufw allow https                   # Public web traffic
 # NOTE: Port 22 is intentionally NOT opened. SSH only via Tailscale.
 ufw --force enable
 
-# --- SSH Hardening ---
-info "Hardening SSH..."
-cat <<EOF > /etc/ssh/sshd_config
-Port 22
-AddressFamily inet
-
-HostKey /etc/ssh/ssh_host_ed25519_key
-HostKey /etc/ssh/ssh_host_ecdsa_key
-HostKey /etc/ssh/ssh_host_rsa_key
-
-SyslogFacility AUTH
-LogLevel VERBOSE
-
-LoginGraceTime 30
-PermitRootLogin prohibit-password
-StrictModes yes
-MaxAuthTries 10
-MaxSessions 5
-
-PubkeyAuthentication yes
-HostbasedAuthentication no
-IgnoreRhosts yes
-PasswordAuthentication no
-PermitEmptyPasswords no
-KbdInteractiveAuthentication no
-
-UsePAM yes
-AllowAgentForwarding no
-AllowTcpForwarding yes
-X11Forwarding no
-PermitTTY yes
-PrintMotd no
-
-ClientAliveInterval 300
-ClientAliveCountMax 2
-TCPKeepAlive no
-
-AllowUsers docker root
-
-KexAlgorithms curve25519-sha256@libssh.org,ecdh-sha2-nistp521,ecdh-sha2-nistp384,ecdh-sha2-nistp256
-Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr
-MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com
-EOF
-
-sshd -t || error "sshd config validation failed"
-systemctl enable ssh
-systemctl restart ssh
+# --- Disable OpenSSH (Tailscale SSH handles all access) ---
+info "Disabling OpenSSH (using Tailscale SSH instead)..."
+systemctl disable ssh
+systemctl stop ssh
 
 # --- fail2ban ---
 info "Configuring fail2ban, auditd, logging..."
@@ -338,13 +287,9 @@ maxretry = 10
 banaction = ufw
 banaction_allports = ufw
 
+# sshd jail disabled — OpenSSH is not running, Tailscale SSH handles access
 [sshd]
-enabled = true
-port = ssh
-filter = sshd
-logpath = /var/log/auth.log
-maxretry = 10
-bantime = 3600
+enabled = false
 EOF
 
 # --- Audit ---
@@ -405,9 +350,12 @@ cat <<'SCRIPT' > /etc/cron.daily/server-health-check
 #!/bin/bash
 report=""
 
-# Check fail2ban bans
-bans=$(fail2ban-client status sshd 2>/dev/null | grep "Currently banned" | awk '{print $NF}')
-[[ "$bans" != "0" ]] && report+="**fail2ban:** $bans IPs currently banned\n"
+# Check fail2ban bans (if any jails are active)
+jail_list=$(fail2ban-client status 2>/dev/null | grep "Jail list" | sed 's/.*://;s/,/\n/g' | tr -d ' ')
+for jail in $jail_list; do
+  bans=$(fail2ban-client status "$jail" 2>/dev/null | grep "Currently banned" | awk '{print $NF}')
+  [[ "$bans" != "0" ]] && report+="**fail2ban ($jail):** $bans IPs currently banned\n"
+done
 
 # Check AIDE file integrity
 aide_output=$(aide --check 2>&1)

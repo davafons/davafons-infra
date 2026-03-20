@@ -1,0 +1,82 @@
+services:
+  # --- Mimir (Prometheus-compatible metrics backend) ---
+  mimir:
+    image: grafana/mimir:2.15.0
+    container_name: mimir
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/mimir/mimir.yaml
+      - -server.http-listen-port=9009
+    volumes:
+      - ./config/mimir.yaml:/etc/mimir/mimir.yaml:ro
+      - mimir_data:/data
+    ports:
+      - "9009:9009"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # --- Loki (log aggregation) ---
+  loki:
+    image: grafana/loki:3.4.3
+    container_name: loki
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/loki/loki.yaml
+    volumes:
+      - ./config/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # --- Tempo (distributed tracing) ---
+  tempo:
+    image: grafana/tempo:2.7.2
+    container_name: tempo
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/tempo/tempo.yaml
+    volumes:
+      - ./config/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # --- Grafana (visualization) ---
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: grafana
+    restart: unless-stopped
+    volumes:
+      - ./config/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GF_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD}
+      - GF_SERVER_ROOT_URL=${GF_ROOT_URL:-http://localhost:3000}
+    depends_on:
+      - mimir
+      - loki
+      - tempo
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+volumes:
+  mimir_data:
+  loki_data:
+  tempo_data:
+  grafana_data:

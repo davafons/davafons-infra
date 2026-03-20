@@ -1,0 +1,120 @@
+// Tailscale ACL policy — managed via GitOps
+// https://tailscale.com/kb/1018/acls
+{
+	"groups": {
+		// The one person who needs access to nadeshiko
+		"group:nadeshiko-users": ["jonathan.197ariza@gmail.com"],
+	},
+
+	"tagOwners": {
+		"tag:nadeshiko":   ["autogroup:admin"],
+		"tag:wariwari":    ["autogroup:admin"],
+		"tag:monitoring":  ["autogroup:admin"],
+		"tag:qtower":        ["autogroup:admin"],
+		"tag:ci":          ["autogroup:admin"],
+	},
+
+	"grants": [
+		// Admin (you) can access everything
+		{
+			"src": ["autogroup:admin"],
+			"dst": ["*"],
+			"ip":  ["*"],
+		},
+
+		// Nadeshiko user can access nadeshiko only
+		{
+			"src": ["group:nadeshiko-users"],
+			"dst": ["tag:nadeshiko"],
+			"ip":  ["*"],
+		},
+
+		// All service servers can push metrics/logs to monitoring
+		{
+			"src": ["tag:nadeshiko"],
+			"dst": ["tag:monitoring"],
+			"ip":  ["*"],
+		},
+		{
+			"src": ["tag:wariwari"],
+			"dst": ["tag:monitoring"],
+			"ip":  ["*"],
+		},
+		{
+			"src": ["tag:qtower"],
+			"dst": ["tag:monitoring"],
+			"ip":  ["*"],
+		},
+
+		// CI can reach all servers for deployments
+		{
+			"src": ["tag:ci"],
+			"dst": ["tag:nadeshiko", "tag:wariwari", "tag:monitoring", "tag:qtower"],
+			"ip":  ["*"],
+		},
+
+		// nadeshiko and wariwari cannot talk to each other (no grant)
+		// monitoring cannot initiate connections to anyone (no grant)
+	],
+
+	"ssh": [
+		// Only davafons can SSH into all servers (browser re-auth required)
+		{
+			"action": "check",
+			"src":    ["autogroup:admin"],
+			"dst":    ["autogroup:tagged"],
+			"users":  ["root", "autogroup:nonroot"],
+		},
+
+		// Jonathan can SSH into nadeshiko only (browser re-auth required)
+		{
+			"action": "check",
+			"src":    ["group:nadeshiko-users"],
+			"dst":    ["tag:nadeshiko"],
+			"users":  ["autogroup:nonroot"],
+		},
+
+		// CI can SSH into servers as docker user
+		{
+			"action": "accept",
+			"src":    ["tag:ci"],
+			"dst":    ["tag:nadeshiko", "tag:wariwari", "tag:qtower"],
+			"users":  ["docker"],
+		},
+	],
+
+	"tests": [
+		// Admin can reach everything
+		{
+			"src":    "autogroup:admin",
+			"accept": ["tag:nadeshiko:443", "tag:wariwari:443", "tag:monitoring:443", "tag:qtower:443"],
+		},
+		// Nadeshiko user can only reach nadeshiko
+		{
+			"src":    "group:nadeshiko-users",
+			"accept": ["tag:nadeshiko:443"],
+			"deny":   ["tag:wariwari:443", "tag:monitoring:443", "tag:qtower:443"],
+		},
+		// Servers can push to monitoring
+		{
+			"src":    "tag:nadeshiko",
+			"accept": ["tag:monitoring:443"],
+			"deny":   ["tag:wariwari:443"],
+		},
+		{
+			"src":    "tag:wariwari",
+			"accept": ["tag:monitoring:443"],
+			"deny":   ["tag:nadeshiko:443"],
+		},
+		// Monitoring cannot reach servers
+		{
+			"src":    "tag:monitoring",
+			"deny":   ["tag:nadeshiko:443", "tag:wariwari:443", "tag:qtower:443"],
+		},
+		// CI can reach all servers
+		{
+			"src":    "tag:ci",
+			"accept": ["tag:nadeshiko:22", "tag:wariwari:22", "tag:qtower:22"],
+		},
+	],
+}
