@@ -30,11 +30,11 @@
 		},
 
 		// All service servers can push metrics/logs/traces to monitoring
-		// Mimir (9009), Loki (3100), Tempo gRPC (4317), Tempo HTTP (4318)
+		// Prometheus (9090), Loki (3100), Tempo gRPC (4317), Tempo HTTP (4318)
 		{
 			"src": ["tag:nadeshiko", "tag:wariwari", "tag:qtower"],
 			"dst": ["tag:monitoring"],
-			"ip":  ["9009", "3100", "4317", "4318"],
+			"ip":  ["9090", "3100", "4317", "4318"],
 		},
 
 		// CI can reach all servers for deployments (SSH only)
@@ -89,17 +89,17 @@
 		// Servers can push metrics/logs/traces to monitoring (specific ports only)
 		{
 			"src":    "tag:nadeshiko",
-			"accept": ["tag:monitoring:9009", "tag:monitoring:3100", "tag:monitoring:4317", "tag:monitoring:4318"],
+			"accept": ["tag:monitoring:9090", "tag:monitoring:3100", "tag:monitoring:4317", "tag:monitoring:4318"],
 			"deny":   ["tag:wariwari:443", "tag:monitoring:3000", "tag:monitoring:443"],
 		},
 		{
 			"src":    "tag:wariwari",
-			"accept": ["tag:monitoring:9009", "tag:monitoring:3100", "tag:monitoring:4317", "tag:monitoring:4318"],
+			"accept": ["tag:monitoring:9090", "tag:monitoring:3100", "tag:monitoring:4317", "tag:monitoring:4318"],
 			"deny":   ["tag:nadeshiko:443", "tag:monitoring:3000", "tag:monitoring:443"],
 		},
 		{
 			"src":    "tag:qtower",
-			"accept": ["tag:monitoring:9009", "tag:monitoring:3100", "tag:monitoring:4317", "tag:monitoring:4318"],
+			"accept": ["tag:monitoring:9090", "tag:monitoring:3100", "tag:monitoring:4317", "tag:monitoring:4318"],
 			"deny":   ["tag:nadeshiko:443", "tag:wariwari:443", "tag:monitoring:3000"],
 		},
 		// Monitoring cannot reach servers
