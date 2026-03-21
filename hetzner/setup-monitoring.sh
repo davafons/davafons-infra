@@ -90,10 +90,21 @@ if $HAS_POSTGRES; then
 cat >> /etc/alloy/config.alloy <<'ALLOY_POSTGRES'
 prometheus.exporter.postgres "default" {
   data_source_names = [sys.env("POSTGRES_DSN")]
+
+  enable_collectors = ["stat_statements"]
+}
+
+discovery.relabel "postgres" {
+  targets = prometheus.exporter.postgres.default.targets
+
+  rule {
+    target_label = "instance"
+    replacement  = constants.hostname
+  }
 }
 
 prometheus.scrape "postgres" {
-  targets    = prometheus.exporter.postgres.default.targets
+  targets    = discovery.relabel.postgres.output
   forward_to = [prometheus.remote_write.default.receiver]
 
   scrape_interval = "60s"
