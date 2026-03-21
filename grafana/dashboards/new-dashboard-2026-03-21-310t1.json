@@ -8,22 +8,11 @@
     "apiVersion": "dashboard.grafana.app/v2beta1",
     "kind": "DashboardWithAccessInfo",
     "metadata": {
-      "annotations": {
-        "grafana.app/createdBy": "user:efgn1zza2qdc0b",
-        "grafana.app/folder": "",
-        "grafana.app/saved-from-ui": "Grafana v12.4.1 (46a02dc12a)",
-        "grafana.app/updatedBy": "user:efgn1zza2qdc0b",
-        "grafana.app/updatedTimestamp": "2026-03-21T01:39:48Z"
-      },
-      "creationTimestamp": "2026-03-21T01:39:48Z",
-      "generation": 2,
       "labels": {
         "grafana.app/deprecatedInternalID": "1"
       },
       "name": "Node Export",
-      "namespace": "default",
-      "resourceVersion": "1774082955025988",
-      "uid": "u6mrh7dnKxuf3jutTfbWQCPY5nXYWR5wYb2S6blhIGkX"
+      "uid": "dcfgo5xybnr400a"
     },
     "spec": {
       "annotations": [
