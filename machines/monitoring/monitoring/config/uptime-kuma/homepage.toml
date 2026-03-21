@@ -1,0 +1,9 @@
+type = "http"
+name = "Prod: Homepage"
+url = "https://nadeshiko.co"
+interval = 120
+max_retries = 3
+retry_interval = 30
+accepted_statuscodes = ["200-299"]
+notification_name_list = ["discord"]
+parent_name = "nadeshiko"

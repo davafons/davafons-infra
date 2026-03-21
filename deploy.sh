@@ -37,6 +37,9 @@ success() { echo -e "${GREEN}=> $1${NC}"; }
 warn()    { echo -e "${YELLOW}=> $1${NC}"; }
 error()   { echo -e "${RED}=> ERROR: $1${NC}" >&2; exit 1; }
 
+# --- Dependencies ---
+command -v yq >/dev/null 2>&1 || error "yq is required but not installed. Install it: sudo pacman -S yq"
+
 # --- Config parsing ---
 # Reads a key from an INI-style [section]
 ini_get() {
@@ -75,9 +78,6 @@ validate_stack() {
   echo "$stacks" | grep -qx "$stack" || error "Stack '$stack' not configured for server '$server'. Available: $(echo "$stacks" | tr '\n' ' ')"
 }
 
-context_name() {
-  echo "deploy-$1"
-}
 
 # --- Environment & Secrets ---
 SSM_PREFIX="/davafons-infra"
@@ -110,12 +110,12 @@ sync_env() {
 
   # 2. Clear env vars from .env.yaml
   local clear_vars
-  clear_vars=$(yq -r '.env.clear // {} | to_entries[] | .key + "=" + (.value | tostring)' "$env_yaml" 2>/dev/null || true)
+  clear_vars=$(yq -r '.env.clear // {} | to_entries[] | .key + "=" + (.value | tostring)' "$env_yaml" 2>/dev/null) || true
   [[ -n "$clear_vars" ]] && env_content+="$clear_vars"$'\n'
 
   # 3. Fetch secrets from AWS SSM
   local secret_names
-  secret_names=$(yq -r '.env.secret // [] | .[]' "$env_yaml" 2>/dev/null || true)
+  secret_names=$(yq -r '.env.secret // [] | .[]' "$env_yaml") || error "Failed to parse secrets from $env_yaml"
 
   if [[ -n "$secret_names" ]]; then
     local ssm_path="$SSM_PREFIX/$server/$stack"
@@ -138,6 +138,15 @@ sync_env() {
     done
   fi
 
+  # Validate no empty values
+  local line
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    local key="${line%%=*}"
+    local val="${line#*=}"
+    [[ -n "$val" ]] || error "Env var '$key' is empty — check SSM or .env.yaml"
+  done <<< "$env_content"
+
   _write_env "$host" "$base_dir/$stack" "$env_content"
 }
 
@@ -146,7 +155,15 @@ _write_env() {
   [[ -n "$content" ]] || return 0
   info "Writing .env to $host:$remote_dir/.env"
   ssh "$host" "mkdir -p $remote_dir"
-  echo "$content" | ssh "$host" "cat > $remote_dir/.env"
+  echo "$content" | ssh "$host" "cat > $remote_dir/.env && chmod 600 $remote_dir/.env"
+}
+
+_clean_env() {
+  local server="$1" stack="$2"
+  local host base_dir
+  host=$(get_server_host "$server")
+  base_dir=$(get_server_base_dir "$server")
+  ssh "$host" "rm -f $base_dir/$stack/.env"
 }
 
 # --- Core functions ---
@@ -172,12 +189,11 @@ sync_stack() {
 docker_compose() {
   local server="$1" stack="$2"
   shift 2
-  local base_dir
+  local host base_dir
+  host=$(get_server_host "$server")
   base_dir=$(get_server_base_dir "$server")
-  local ctx
-  ctx=$(context_name "$server")
 
-  docker --context "$ctx" compose -f "$base_dir/$stack/docker-compose.yaml" "$@"
+  ssh "$host" "cd $base_dir/$stack && docker compose $*"
 }
 
 resolve_stacks() {
@@ -195,22 +211,11 @@ resolve_stacks() {
 # --- Commands ---
 cmd_setup() {
   local server="$1"
-  local host ctx
+  local host
   host=$(get_server_host "$server")
-  ctx=$(context_name "$server")
 
-  info "Setting up docker context '$ctx' for $host"
-
-  if docker context inspect "$ctx" &>/dev/null; then
-    warn "Context '$ctx' already exists, updating..."
-    docker context rm -f "$ctx" >/dev/null
-  fi
-
-  docker context create "$ctx" --docker "host=ssh://$host"
-  success "Docker context '$ctx' created"
-
-  info "Testing connection..."
-  if docker --context "$ctx" info >/dev/null 2>&1; then
+  info "Testing SSH connection to $host..."
+  if ssh "$host" "docker info" >/dev/null 2>&1; then
     success "Connected to Docker on $host"
   else
     error "Failed to connect. Check SSH access: ssh $host"
@@ -220,21 +225,18 @@ cmd_setup() {
 cmd_deploy() {
   local server="$1"
   local stack="${2:-}"
+  local service="${3:-}"
   local stacks
   stacks=$(resolve_stacks "$server" "$stack")
 
-  # Ensure context exists
-  local ctx
-  ctx=$(context_name "$server")
-  docker context inspect "$ctx" &>/dev/null || cmd_setup "$server"
-
   for s in $stacks; do
     echo ""
-    info "${BOLD}Deploying $s to $server${NC}"
+    info "${BOLD}Deploying $s${service:+ ($service)} to $server${NC}"
     sync_env "$server" "$s"
     sync_stack "$server" "$s"
-    docker_compose "$server" "$s" up -d --remove-orphans
-    success "$s deployed"
+    docker_compose "$server" "$s" up -d --remove-orphans $service
+    _clean_env "$server" "$s"
+    success "$s${service:+ ($service)} deployed"
   done
 }
 
@@ -297,6 +299,49 @@ cmd_ps() {
   done
 }
 
+cmd_env() {
+  local server="$1"
+  local stack="${2:-}"
+  local stacks
+  stacks=$(resolve_stacks "$server" "$stack")
+
+  for s in $stacks; do
+    local ssm_path="$SSM_PREFIX/$server/$s"
+    echo -e "\n${BOLD}[$s]${NC} (SSM: $ssm_path)"
+    aws ssm get-parameters-by-path \
+      --path "$ssm_path/" \
+      --with-decryption \
+      --query "Parameters[*].[Name,Value]" \
+      --output text || error "Failed to fetch secrets from AWS SSM. Try: aws login"
+  done
+}
+
+cmd_reboot() {
+  local server="$1"
+  local stack="${2:-}"
+  local service="${3:-}"
+  local stacks
+  stacks=$(resolve_stacks "$server" "$stack")
+
+  for s in $stacks; do
+    echo ""
+    info "${BOLD}Rebooting $s${service:+ ($service)} on $server${NC}"
+    sync_env "$server" "$s"
+    sync_stack "$server" "$s"
+    if [[ -n "$service" ]]; then
+      docker_compose "$server" "$s" rm -fsv "$service"
+      local host
+      host=$(get_server_host "$server")
+      ssh "$host" "docker volume ls -q --filter name=${s}_${service} | xargs -r docker volume rm"
+    else
+      docker_compose "$server" "$s" down -v
+    fi
+    docker_compose "$server" "$s" up -d --remove-orphans $service
+    _clean_env "$server" "$s"
+    success "$s${service:+ ($service)} rebooted"
+  done
+}
+
 cmd_exec() {
   local server="$1"
   local stack="$2"
@@ -345,7 +390,9 @@ Usage:
 
 Commands:
   setup              Set up docker context for a server
-  deploy [stack]     Sync and deploy stack(s) — omit stack to deploy all
+  deploy [stack] [service]  Sync and deploy stack(s) — optionally target a single service
+  env [stack]              Fetch and display env/secrets without deploying
+  reboot [stack] [service] Destroy containers & volumes, then redeploy from scratch
   restart [stack]    Restart stack(s)
   stop [stack]       Stop stack(s)
   pull [stack]       Pull latest images
@@ -387,7 +434,9 @@ validate_server "$SERVER"
 
 case "$COMMAND" in
   setup)   cmd_setup "$SERVER" ;;
-  deploy)  cmd_deploy "$SERVER" "${3:-}" ;;
+  deploy)  cmd_deploy "$SERVER" "${3:-}" "${4:-}" ;;
+  env)     cmd_env "$SERVER" "${3:-}" ;;
+  reboot)  cmd_reboot "$SERVER" "${3:-}" "${4:-}" ;;
   pull)    cmd_pull "$SERVER" "${3:-}" ;;
   restart) cmd_restart "$SERVER" "${3:-}" ;;
   stop)    cmd_stop "$SERVER" "${3:-}" ;;

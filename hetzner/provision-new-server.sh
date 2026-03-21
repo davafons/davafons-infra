@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # --- Config ---
-SERVER_NAME="${1:-wariwari-prod}"
+SERVER_NAME="${1:?Usage: hetzner-provision <server-name> [server-type] [location]}"
 SERVER_TYPE="${2:-cx23}"
 LOCATION="${3:-hel1}"
 IMAGE="ubuntu-24.04"
@@ -26,7 +26,7 @@ error()   { echo -e "${RED}=> ERROR: $1${NC}" >&2; exit 1; }
 
 # --- Preflight ---
 command -v hcloud >/dev/null || error "hcloud CLI not installed. Run: sudo pacman -S hcloud"
-hcloud server list >/dev/null 2>&1 || error "hcloud not configured. Run: hcloud context create wariwari"
+hcloud server list >/dev/null 2>&1 || error "hcloud not configured. Run: hcloud context create inari"
 
 # --- Tailscale auth key ---
 echo ""

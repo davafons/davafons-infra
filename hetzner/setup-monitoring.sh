@@ -82,41 +82,28 @@ prometheus.remote_write "default" {
   }
 }
 
-// --- Docker container logs ---
-local.file_match "docker_logs" {
-  path_targets = [{
-    __path__ = "/var/lib/docker/containers/*/*-json.log",
-  }]
+// --- Docker container logs (via Docker API) ---
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
 }
 
-loki.source.file "docker_logs" {
-  targets    = local.file_match.docker_logs.targets
+discovery.relabel "docker_containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    target_label  = "container"
+  }
+}
+
+loki.source.docker "docker_logs" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.docker_containers.output
   forward_to = [loki.process.docker_logs.receiver]
 }
 
 loki.process "docker_logs" {
-  stage.json {
-    expressions = {
-      log    = "log",
-      stream = "stream",
-      time   = "time",
-    }
-  }
-
-  stage.output {
-    source = "log"
-  }
-
-  stage.labels {
-    values = {
-      stream = "stream",
-    }
-  }
-
-  stage.timestamp {
-    source = "time"
-    format = "RFC3339Nano"
-  }
+  stage.docker {}
 
   forward_to = [loki.write.default.receiver]
 }
@@ -179,7 +166,7 @@ cat > /etc/systemd/system/alloy.service.d/override.conf <<EOF
 EnvironmentFile=/etc/alloy/environment
 EOF
 
-# Alloy needs access to Docker logs
+# Alloy needs Docker socket access for container log collection
 usermod -aG docker alloy 2>/dev/null || true
 
 # --- Start Alloy ---

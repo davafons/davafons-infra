@@ -8,7 +8,7 @@
 
 	"tagOwners": {
 		"tag:nadeshiko":   ["autogroup:admin"],
-		"tag:wariwari":    ["autogroup:admin"],
+		"tag:inari":    ["autogroup:admin"],
 		"tag:monitoring":  ["autogroup:admin"],
 		"tag:qtower":        ["autogroup:admin"],
 		"tag:ci":          ["autogroup:admin"],
@@ -32,7 +32,7 @@
 		// All service servers can push metrics/logs/traces to monitoring
 		// Prometheus (9090), Loki (3100), Tempo gRPC (4317), Tempo HTTP (4318)
 		{
-			"src": ["tag:nadeshiko", "tag:wariwari", "tag:qtower"],
+			"src": ["tag:nadeshiko", "tag:inari", "tag:qtower"],
 			"dst": ["tag:monitoring"],
 			"ip":  ["9090", "3100", "4317", "4318"],
 		},
@@ -40,11 +40,11 @@
 		// CI can reach all servers for deployments (SSH only)
 		{
 			"src": ["tag:ci"],
-			"dst": ["tag:nadeshiko", "tag:wariwari", "tag:monitoring", "tag:qtower"],
+			"dst": ["tag:nadeshiko", "tag:inari", "tag:monitoring", "tag:qtower"],
 			"ip":  ["22"],
 		},
 
-		// nadeshiko and wariwari cannot talk to each other (no grant)
+		// nadeshiko and inari cannot talk to each other (no grant)
 		// monitoring cannot initiate connections to anyone (no grant)
 	],
 
@@ -69,7 +69,7 @@
 		{
 			"action": "accept",
 			"src":    ["tag:ci"],
-			"dst":    ["tag:nadeshiko", "tag:wariwari", "tag:monitoring", "tag:qtower"],
+			"dst":    ["tag:nadeshiko", "tag:inari", "tag:monitoring", "tag:qtower"],
 			"users":  ["docker"],
 		},
 	],
@@ -78,40 +78,40 @@
 		// Admin can reach everything
 		{
 			"src":    "davafons@gmail.com",
-			"accept": ["tag:nadeshiko:443", "tag:wariwari:443", "tag:monitoring:443", "tag:qtower:443"],
+			"accept": ["tag:nadeshiko:443", "tag:inari:443", "tag:monitoring:443", "tag:qtower:443"],
 		},
 		// Nadeshiko user can only reach nadeshiko
 		{
 			"src":    "group:nadeshiko-users",
 			"accept": ["tag:nadeshiko:443"],
-			"deny":   ["tag:wariwari:443", "tag:monitoring:443", "tag:qtower:443"],
+			"deny":   ["tag:inari:443", "tag:monitoring:443", "tag:qtower:443"],
 		},
 		// Servers can push metrics/logs/traces to monitoring (specific ports only)
 		{
 			"src":    "tag:nadeshiko",
 			"accept": ["tag:monitoring:9090", "tag:monitoring:3100", "tag:monitoring:4317", "tag:monitoring:4318"],
-			"deny":   ["tag:wariwari:443", "tag:monitoring:3000", "tag:monitoring:443"],
+			"deny":   ["tag:inari:443", "tag:monitoring:3000", "tag:monitoring:443"],
 		},
 		{
-			"src":    "tag:wariwari",
+			"src":    "tag:inari",
 			"accept": ["tag:monitoring:9090", "tag:monitoring:3100", "tag:monitoring:4317", "tag:monitoring:4318"],
 			"deny":   ["tag:nadeshiko:443", "tag:monitoring:3000", "tag:monitoring:443"],
 		},
 		{
 			"src":    "tag:qtower",
 			"accept": ["tag:monitoring:9090", "tag:monitoring:3100", "tag:monitoring:4317", "tag:monitoring:4318"],
-			"deny":   ["tag:nadeshiko:443", "tag:wariwari:443", "tag:monitoring:3000"],
+			"deny":   ["tag:nadeshiko:443", "tag:inari:443", "tag:monitoring:3000"],
 		},
 		// Monitoring cannot reach servers
 		{
 			"src":    "tag:monitoring",
-			"deny":   ["tag:nadeshiko:443", "tag:wariwari:443", "tag:qtower:443"],
+			"deny":   ["tag:nadeshiko:443", "tag:inari:443", "tag:qtower:443"],
 		},
 		// CI can SSH into all servers
 		{
 			"src":    "tag:ci",
-			"accept": ["tag:nadeshiko:22", "tag:wariwari:22", "tag:monitoring:22", "tag:qtower:22"],
-			"deny":   ["tag:nadeshiko:443", "tag:wariwari:443"],
+			"accept": ["tag:nadeshiko:22", "tag:inari:22", "tag:monitoring:22", "tag:qtower:22"],
+			"deny":   ["tag:nadeshiko:443", "tag:inari:443"],
 		},
 	],
 }
