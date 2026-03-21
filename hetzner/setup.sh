@@ -123,9 +123,25 @@ HEARTBEAT_PID=$!
 
 log "Provisioning started"
 
+# --- Wait for dpkg lock (unattended-upgrades may be running on fresh servers) ---
+wait_for_apt() {
+  local max_wait=300
+  local waited=0
+  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+    if (( waited == 0 )); then
+      log "Waiting for dpkg lock (unattended-upgrades?)..."
+    fi
+    sleep 5
+    waited=$((waited + 5))
+    (( waited >= max_wait )) && die "dpkg lock held for over ${max_wait}s — aborting"
+  done
+}
+
 # --- System Updates ---
 log "Updating system packages..."
+wait_for_apt
 apt-get update
+wait_for_apt
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 
 # --- Tailscale (first, to guarantee remote access) ---
@@ -369,6 +385,7 @@ systemctl enable apparmor chrony docker fail2ban auditd
 systemctl restart apparmor chrony docker fail2ban auditd
 
 # --- Cleanup ---
+wait_for_apt
 apt-get autoremove -y
 apt-get clean
 
