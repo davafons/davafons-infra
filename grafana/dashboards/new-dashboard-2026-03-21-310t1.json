@@ -20,9 +20,10 @@
       "labels": {
         "grafana.app/deprecatedInternalID": "1"
       },
-      "name": "rYdddlPWk",
+      "name": "Node Export",
       "namespace": "default",
-      "resourceVersion": "1774082955025988"
+      "resourceVersion": "1774082955025988",
+      "uid": "u6mrh7dnKxuf3jutTfbWQCPY5nXYWR5wYb2S6blhIGkX"
     },
     "spec": {
       "annotations": [
