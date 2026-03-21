@@ -41,6 +41,12 @@ fi
 [[ -n "${PROMETHEUS_REMOTE_WRITE_URL:-}" ]] || error "PROMETHEUS_REMOTE_WRITE_URL is required"
 [[ -n "${LOKI_URL:-}" ]] || error "LOKI_URL is required"
 
+HAS_POSTGRES=false
+if [[ -n "${POSTGRES_DSN:-}" ]]; then
+  HAS_POSTGRES=true
+  info "PostgreSQL DSN found — will enable postgres exporter"
+fi
+
 # --- Install Alloy ---
 info "Installing Grafana Alloy..."
 
@@ -77,6 +83,25 @@ prometheus.scrape "docker" {
   scrape_interval = "60s"
 }
 
+// --- PostgreSQL metrics (enabled when POSTGRES_DSN is set) ---
+ALLOY_CONFIG
+
+if $HAS_POSTGRES; then
+cat >> /etc/alloy/config.alloy <<'ALLOY_POSTGRES'
+prometheus.exporter.postgres "default" {
+  data_source_names = [sys.env("POSTGRES_DSN")]
+}
+
+prometheus.scrape "postgres" {
+  targets    = prometheus.exporter.postgres.default.targets
+  forward_to = [prometheus.remote_write.default.receiver]
+
+  scrape_interval = "60s"
+}
+ALLOY_POSTGRES
+fi
+
+cat >> /etc/alloy/config.alloy <<'ALLOY_CONFIG'
 // --- Ship metrics to Prometheus ---
 prometheus.remote_write "default" {
   endpoint {
@@ -163,6 +188,12 @@ cat > /etc/alloy/environment <<EOF
 PROMETHEUS_REMOTE_WRITE_URL=${PROMETHEUS_REMOTE_WRITE_URL}
 LOKI_URL=${LOKI_URL}
 EOF
+
+if $HAS_POSTGRES; then
+  cat >> /etc/alloy/environment <<EOF
+POSTGRES_DSN=${POSTGRES_DSN}
+EOF
+fi
 chmod 600 /etc/alloy/environment
 
 # Make systemd load the environment file
