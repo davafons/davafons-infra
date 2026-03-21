@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_ADMIN_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_ADMIN_PASSWORD}
+      - POSTGRES_DB=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+      - "${TAILSCALE_IP}:5432:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  pg-backup:
+    image: kartoza/pg-backup:17-3.5
+    container_name: pg-backup
+    restart: unless-stopped
+    environment:
+      - CRON_SCHEDULE=0 2 * * *
+      - REMOVE_BEFORE=30
+      - STORAGE_BACKEND=S3
+      - CONSOLE_LOGGING=True
+      - SSL_SECURE=True
+      - POSTGRES_MAJOR_VERSION=17
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_ADMIN_USER}
+      - POSTGRES_PASS=${POSTGRES_ADMIN_PASSWORD}
+      - ACCESS_KEY_ID=${R2_BACKUP_ACCESS_KEY_ID}
+      - SECRET_ACCESS_KEY=${R2_BACKUP_SECRET_ACCESS_KEY}
+      - BUCKET=${R2_BACKUP_BUCKET}
+      - HOST_BASE=${R2_BACKUP_HOST_BASE}
+      - HOST_BUCKET=${R2_BACKUP_HOST_BUCKET}
+      - DEFAULT_REGION=auto
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:

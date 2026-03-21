@@ -44,8 +44,20 @@
 			"ip":  ["22"],
 		},
 
+		// Monitoring can reach admin tools on service servers
+		// Postgres on inari (5432), Elasticsearch on nadeshiko (9200)
+		{
+			"src": ["tag:monitoring"],
+			"dst": ["tag:inari", "tag:nadeshiko"],
+			"ip":  ["5432"],
+		},
+		{
+			"src": ["tag:monitoring"],
+			"dst": ["tag:nadeshiko"],
+			"ip":  ["9200"],
+		},
+
 		// nadeshiko and inari cannot talk to each other (no grant)
-		// monitoring cannot initiate connections to anyone (no grant)
 	],
 
 	"ssh": [
@@ -102,9 +114,10 @@
 			"accept": ["tag:monitoring:9090", "tag:monitoring:3100", "tag:monitoring:4317", "tag:monitoring:4318"],
 			"deny":   ["tag:nadeshiko:443", "tag:inari:443", "tag:monitoring:3000"],
 		},
-		// Monitoring cannot reach servers
+		// Monitoring can reach specific admin ports on service servers
 		{
 			"src":    "tag:monitoring",
+			"accept": ["tag:inari:5432", "tag:nadeshiko:5432", "tag:nadeshiko:9200"],
 			"deny":   ["tag:nadeshiko:443", "tag:inari:443", "tag:qtower:443"],
 		},
 		// CI can SSH into all servers

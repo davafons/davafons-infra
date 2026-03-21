@@ -32,6 +32,12 @@ if [[ -f "$SECRETS_FILE" ]]; then
   source "$SECRETS_FILE"
 fi
 
+# Fall back to existing Alloy environment (from previous install)
+ALLOY_ENV="/etc/alloy/environment"
+if [[ -f "$ALLOY_ENV" ]]; then
+  source "$ALLOY_ENV"
+fi
+
 [[ -n "${PROMETHEUS_REMOTE_WRITE_URL:-}" ]] || error "PROMETHEUS_REMOTE_WRITE_URL is required"
 [[ -n "${LOKI_URL:-}" ]] || error "LOKI_URL is required"
 

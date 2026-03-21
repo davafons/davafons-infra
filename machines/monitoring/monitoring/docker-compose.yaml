@@ -109,9 +109,44 @@ services:
     depends_on:
       - uptime-kuma
 
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: unless-stopped
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+      - PGADMIN_LISTEN_PORT=5050
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "${TAILSCALE_IP}:5050:5050"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.17.10
+    container_name: kibana
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS}
+      - ELASTICSEARCH_SERVICEACCOUNTTOKEN=${KIBANA_SERVICE_ACCOUNT_TOKEN}
+    volumes:
+      - kibana_data:/usr/share/kibana/config
+    ports:
+      - "${TAILSCALE_IP}:5601:5601"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
 volumes:
   prometheus_data:
   loki_data:
   tempo_data:
   grafana_data:
   uptime_kuma_data:
+  pgadmin_data:
+  kibana_data:
