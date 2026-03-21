@@ -1,8 +1,8 @@
 {
   "apiVersion": "dashboard.grafana.app/v1beta1",
-  "kind": "DashboardWithAccessInfo",
+  "kind": "Dashboard",
   "metadata": {
-    "name": "Node Exporter Servers"
+    "name": "node-exporter-servers"
   },
   "spec": {
     "annotations": {
