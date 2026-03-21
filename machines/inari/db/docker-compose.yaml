@@ -3,6 +3,10 @@ services:
     image: postgres:17
     container_name: postgres
     restart: unless-stopped
+    command: >
+      -c shared_preload_libraries='pg_stat_statements,auto_explain'
+      -c pg_stat_statements.track=all
+      -c auto_explain.log_min_duration=1000
     environment:
       - POSTGRES_USER=${POSTGRES_ADMIN_USER}
       - POSTGRES_PASSWORD=${POSTGRES_ADMIN_PASSWORD}

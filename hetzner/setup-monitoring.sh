@@ -221,4 +221,30 @@ else
   error "Alloy failed to start. Check: journalctl -u alloy"
 fi
 
+# --- Install postgresqltuner (if PostgreSQL is present) ---
+if $HAS_POSTGRES; then
+  info "Installing postgresqltuner..."
+  apt-get install -y perl libdbi-perl libdbd-pg-perl
+  curl -fsSL https://raw.githubusercontent.com/jfcoz/postgresqltuner/master/postgresqltuner.pl \
+    -o /usr/local/bin/postgresqltuner.pl
+  chmod +x /usr/local/bin/postgresqltuner.pl
+
+  # Wrapper that reads POSTGRES_DSN from Alloy environment
+  cat > /usr/local/bin/postgresqltuner <<'WRAPPER'
+#!/bin/bash
+set -euo pipefail
+source /etc/alloy/environment
+# Parse: postgresql://user:pass@host:port/dbname?params
+PGUSER=$(echo "$POSTGRES_DSN" | sed -n 's|postgresql://\([^:]*\):.*|\1|p')
+PGPASS=$(echo "$POSTGRES_DSN" | sed -n 's|postgresql://[^:]*:\([^@]*\)@.*|\1|p')
+PGHOST=$(echo "$POSTGRES_DSN" | sed -n 's|postgresql://[^@]*@\([^:]*\):.*|\1|p')
+PGPORT=$(echo "$POSTGRES_DSN" | sed -n 's|postgresql://[^@]*@[^:]*:\([^/]*\)/.*|\1|p')
+PGDB=$(echo "$POSTGRES_DSN" | sed -n 's|postgresql://[^/]*/\([^?]*\).*|\1|p')
+exec postgresqltuner.pl --host="$PGHOST" --port="$PGPORT" --user="$PGUSER" --password="$PGPASS" --database="$PGDB" "$@"
+WRAPPER
+  chmod +x /usr/local/bin/postgresqltuner
+
+  success "postgresqltuner installed — run: postgresqltuner"
+fi
+
 success "Monitoring setup complete! Metrics and logs shipping to Prometheus/Loki."
