@@ -52,7 +52,7 @@ info "Installing Grafana Alloy..."
 
 apt-get install -y gpg
 mkdir -p /etc/apt/keyrings/
-curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
+curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor --yes -o /etc/apt/keyrings/grafana.gpg
 chmod 644 /etc/apt/keyrings/grafana.gpg
 echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" \
   > /etc/apt/sources.list.d/grafana.list
@@ -91,7 +91,7 @@ cat >> /etc/alloy/config.alloy <<'ALLOY_POSTGRES'
 prometheus.exporter.postgres "default" {
   data_source_names = [sys.env("POSTGRES_DSN")]
 
-  enable_collectors = ["stat_statements"]
+  enabled_collectors = ["stat_statements"]
 }
 
 discovery.relabel "postgres" {
