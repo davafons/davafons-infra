@@ -132,7 +132,7 @@ sync_env() {
     # Extract each secret (like: kamal secrets extract <path/NAME> $SECRETS)
     for name in $secret_names; do
       local value
-      value=$(echo "$params" | grep "$ssm_path/$name" | cut -f2)
+      value=$(echo "$params" | grep "$ssm_path/$name" | cut -f2 || true)
       [[ -n "$value" ]] || error "Secret '$name' not found in SSM at $ssm_path/$name"
       env_content+="$name=$value"$'\n'
     done

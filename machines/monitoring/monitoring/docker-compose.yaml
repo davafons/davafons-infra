@@ -124,23 +124,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
-
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.17.10
-    container_name: kibana
-    restart: unless-stopped
-    environment:
-      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS}
-      - ELASTICSEARCH_SERVICEACCOUNTTOKEN=${KIBANA_SERVICE_ACCOUNT_TOKEN}
-    volumes:
-      - kibana_data:/usr/share/kibana/config
-    ports:
-      - "${TAILSCALE_IP}:5601:5601"
-    deploy:
-      resources:
-        limits:
-          memory: 256M
+          memory: 512M
 
 volumes:
   prometheus_data:
@@ -149,4 +133,3 @@ volumes:
   grafana_data:
   uptime_kuma_data:
   pgadmin_data:
-  kibana_data:
