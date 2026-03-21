@@ -21,7 +21,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPOSE_DIR="$SCRIPT_DIR/docker-compose"
+MACHINES_DIR="$SCRIPT_DIR/machines"
 CONF_FILE="$SCRIPT_DIR/deploy.conf"
 
 # --- Colors ---
@@ -38,23 +38,26 @@ warn()    { echo -e "${YELLOW}=> $1${NC}"; }
 error()   { echo -e "${RED}=> ERROR: $1${NC}" >&2; exit 1; }
 
 # --- Config parsing ---
+# Reads a key from an INI-style [section]
+ini_get() {
+  local section="$1" key="$2"
+  sed -n "/^\[$section\]/,/^\[/p" "$CONF_FILE" | grep "^$key " | sed "s/^$key *= *//"
+}
+
 get_server_host() {
-  local server="$1"
-  grep "^SERVER $server " "$CONF_FILE" | awk '{print $3}'
+  ini_get "$1" "host"
 }
 
 get_server_base_dir() {
-  local server="$1"
-  grep "^SERVER $server " "$CONF_FILE" | awk '{print $4}'
+  ini_get "$1" "dir"
 }
 
 get_server_stacks() {
-  local server="$1"
-  grep "^STACK $server " "$CONF_FILE" | awk '{print $3}'
+  ini_get "$1" "stacks" | tr ' ' '\n'
 }
 
 get_all_servers() {
-  grep "^SERVER " "$CONF_FILE" | awk '{print $2}'
+  grep '^\[' "$CONF_FILE" | tr -d '[]'
 }
 
 validate_server() {
@@ -76,6 +79,76 @@ context_name() {
   echo "deploy-$1"
 }
 
+# --- Environment & Secrets ---
+SSM_PREFIX="/davafons-infra"
+
+# Builds the .env file from three sources:
+#   1. Runtime vars from the server (/etc/environment, e.g. TAILSCALE_IP)
+#   2. Clear env vars from .env.yaml (committed, non-secret config)
+#   3. Secrets from .env.yaml fetched from AWS SSM Parameter Store
+#
+# .env.yaml format (same structure as Kamal's deploy.yml):
+#   env:
+#     clear:
+#       KEY: value
+#     secret:
+#       - SECRET_NAME
+sync_env() {
+  local server="$1" stack="$2"
+  local host base_dir
+  host=$(get_server_host "$server")
+  base_dir=$(get_server_base_dir "$server")
+
+  local env_yaml="$MACHINES_DIR/$server/$stack/.env.yaml"
+  local env_content=""
+
+  # 1. Runtime vars from the server
+  info "Fetching runtime vars from $host"
+  env_content+=$(ssh "$host" "cat /etc/environment" 2>/dev/null || true)$'\n'
+
+  [[ -f "$env_yaml" ]] || { _write_env "$host" "$base_dir/$stack" "$env_content"; return 0; }
+
+  # 2. Clear env vars from .env.yaml
+  local clear_vars
+  clear_vars=$(yq -r '.env.clear // {} | to_entries[] | .key + "=" + (.value | tostring)' "$env_yaml" 2>/dev/null || true)
+  [[ -n "$clear_vars" ]] && env_content+="$clear_vars"$'\n'
+
+  # 3. Fetch secrets from AWS SSM
+  local secret_names
+  secret_names=$(yq -r '.env.secret // [] | .[]' "$env_yaml" 2>/dev/null || true)
+
+  if [[ -n "$secret_names" ]]; then
+    local ssm_path="$SSM_PREFIX/$server/$stack"
+    info "Fetching secrets for $stack from $ssm_path"
+
+    # Bulk fetch (like: kamal secrets fetch --adapter aws_ssm_parameter_store --from <path>)
+    local params
+    params=$(aws ssm get-parameters-by-path \
+      --path "$ssm_path/" \
+      --with-decryption \
+      --query "Parameters[*].[Name,Value]" \
+      --output text) || error "Failed to fetch secrets from AWS SSM (path: $ssm_path)"
+
+    # Extract each secret (like: kamal secrets extract <path/NAME> $SECRETS)
+    for name in $secret_names; do
+      local value
+      value=$(echo "$params" | grep "$ssm_path/$name" | cut -f2)
+      [[ -n "$value" ]] || error "Secret '$name' not found in SSM at $ssm_path/$name"
+      env_content+="$name=$value"$'\n'
+    done
+  fi
+
+  _write_env "$host" "$base_dir/$stack" "$env_content"
+}
+
+_write_env() {
+  local host="$1" remote_dir="$2" content="$3"
+  [[ -n "$content" ]] || return 0
+  info "Writing .env to $host:$remote_dir/.env"
+  ssh "$host" "mkdir -p $remote_dir"
+  echo "$content" | ssh "$host" "cat > $remote_dir/.env"
+}
+
 # --- Core functions ---
 sync_stack() {
   local server="$1" stack="$2"
@@ -83,7 +156,7 @@ sync_stack() {
   host=$(get_server_host "$server")
   base_dir=$(get_server_base_dir "$server")
 
-  local local_dir="$COMPOSE_DIR/$stack/"
+  local local_dir="$MACHINES_DIR/$server/$stack/"
   local remote_dir="$base_dir/$stack/"
 
   [[ -d "$local_dir" ]] || error "Local stack directory not found: $local_dir"
@@ -92,7 +165,7 @@ sync_stack() {
   ssh "$host" "mkdir -p $remote_dir"
   rsync -avz --delete \
     --exclude '.env' \
-    --exclude '.env.local' \
+    --exclude '.env.yaml' \
     "$local_dir" "$host:$remote_dir"
 }
 
@@ -158,6 +231,7 @@ cmd_deploy() {
   for s in $stacks; do
     echo ""
     info "${BOLD}Deploying $s to $server${NC}"
+    sync_env "$server" "$s"
     sync_stack "$server" "$s"
     docker_compose "$server" "$s" up -d --remove-orphans
     success "$s deployed"
@@ -282,14 +356,14 @@ Commands:
   info               Show server configuration
 
 Examples:
-  ./deploy.sh observability setup
-  ./deploy.sh observability deploy observability
-  ./deploy.sh wariwari-prod deploy db
-  ./deploy.sh wariwari-prod deploy              # deploy all stacks
-  ./deploy.sh wariwari-prod ps
-  ./deploy.sh observability logs observability --since 5m
-  ./deploy.sh observability exec observability grafana sh
-  ./deploy.sh wariwari-prod shell
+  ./deploy.sh monitoring setup
+  ./deploy.sh monitoring deploy monitoring
+  ./deploy.sh qtower deploy db
+  ./deploy.sh qtower deploy              # deploy all stacks
+  ./deploy.sh qtower ps
+  ./deploy.sh monitoring logs monitoring --since 5m
+  ./deploy.sh monitoring exec monitoring grafana sh
+  ./deploy.sh qtower shell
   ./deploy.sh info                              # show all servers
 EOF
 }
