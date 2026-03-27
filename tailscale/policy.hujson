@@ -12,6 +12,7 @@
 		"tag:monitoring":  ["autogroup:admin"],
 		"tag:qtower":        ["autogroup:admin"],
 		"tag:ci":          ["autogroup:admin"],
+		"tag:tower":       ["autogroup:admin"],
 	},
 
 	"grants": [
@@ -61,7 +62,15 @@
 	],
 
 	"ssh": [
-		// Only davafons can SSH into all servers (browser re-auth required)
+		// Admin can SSH into tower from phone without re-auth
+		{
+			"action": "accept",
+			"src":    ["autogroup:admin"],
+			"dst":    ["tag:tower"],
+			"users":  ["root", "autogroup:nonroot"],
+		},
+
+		// Admin can SSH into all other servers (browser re-auth required)
 		{
 			"action": "check",
 			"src":    ["autogroup:admin"],
@@ -90,7 +99,7 @@
 		// Admin can reach everything
 		{
 			"src":    "davafons@gmail.com",
-			"accept": ["tag:nadeshiko:443", "tag:inari:443", "tag:monitoring:443", "tag:qtower:443"],
+			"accept": ["tag:nadeshiko:443", "tag:inari:443", "tag:monitoring:443", "tag:qtower:443", "tag:tower:22"],
 		},
 		// Nadeshiko user can only reach nadeshiko
 		{
