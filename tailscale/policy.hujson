@@ -30,6 +30,14 @@
 			"ip":  ["*"],
 		},
 
+		// Nadeshiko users can access monitoring services
+		// Grafana (3000), Uptime Kuma (3010), pgAdmin (5050), Prometheus (9090)
+		{
+			"src": ["group:nadeshiko-users"],
+			"dst": ["tag:monitoring"],
+			"ip":  ["3000", "3010", "5050", "9090"],
+		},
+
 		// All service servers can push metrics/logs/traces to monitoring
 		// Prometheus (9090), Loki (3100), Tempo gRPC (4317), Tempo HTTP (4318)
 		{
@@ -101,10 +109,10 @@
 			"src":    "davafons@gmail.com",
 			"accept": ["tag:nadeshiko:443", "tag:inari:443", "tag:monitoring:443", "tag:qtower:443", "tag:tower:22"],
 		},
-		// Nadeshiko user can only reach nadeshiko
+		// Nadeshiko user can reach nadeshiko and monitoring services
 		{
 			"src":    "group:nadeshiko-users",
-			"accept": ["tag:nadeshiko:443"],
+			"accept": ["tag:nadeshiko:443", "tag:monitoring:3000", "tag:monitoring:3010", "tag:monitoring:5050", "tag:monitoring:9090"],
 			"deny":   ["tag:inari:443", "tag:monitoring:443", "tag:qtower:443"],
 		},
 		// Servers can push metrics/logs/traces to monitoring (specific ports only)

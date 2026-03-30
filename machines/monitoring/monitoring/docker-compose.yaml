@@ -18,7 +18,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1024M
 
   loki:
     image: grafana/loki:3.4.3

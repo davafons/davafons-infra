@@ -47,6 +47,12 @@ if [[ -n "${POSTGRES_DSN:-}" ]]; then
   info "PostgreSQL DSN found — will enable postgres exporter"
 fi
 
+HAS_ELASTICSEARCH=false
+if [[ -n "${ELASTICSEARCH_URL:-}" ]]; then
+  HAS_ELASTICSEARCH=true
+  info "Elasticsearch URL found — will enable elasticsearch exporter"
+fi
+
 # --- Install Alloy ---
 info "Installing Grafana Alloy..."
 
@@ -110,6 +116,20 @@ prometheus.scrape "postgres" {
   scrape_interval = "60s"
 }
 ALLOY_POSTGRES
+fi
+
+if $HAS_ELASTICSEARCH; then
+cat >> /etc/alloy/config.alloy <<'ALLOY_ELASTICSEARCH'
+// --- Elasticsearch metrics (via elasticsearch_exporter sidecar) ---
+prometheus.scrape "elasticsearch" {
+  targets = [{
+    __address__ = "127.0.0.1:9114",
+  }]
+  forward_to = [prometheus.remote_write.default.receiver]
+
+  scrape_interval = "60s"
+}
+ALLOY_ELASTICSEARCH
 fi
 
 cat >> /etc/alloy/config.alloy <<'ALLOY_CONFIG'
@@ -205,6 +225,12 @@ if $HAS_POSTGRES; then
 POSTGRES_DSN=${POSTGRES_DSN}
 EOF
 fi
+
+if $HAS_ELASTICSEARCH; then
+  cat >> /etc/alloy/environment <<EOF
+ELASTICSEARCH_URL=${ELASTICSEARCH_URL}
+EOF
+fi
 chmod 600 /etc/alloy/environment
 
 # Make systemd load the environment file
@@ -230,6 +256,26 @@ if systemctl is-active --quiet alloy; then
   success "Alloy is running"
 else
   error "Alloy failed to start. Check: journalctl -u alloy"
+fi
+
+# --- Start elasticsearch_exporter (if Elasticsearch is present) ---
+if $HAS_ELASTICSEARCH; then
+  info "Starting elasticsearch_exporter..."
+
+  docker rm -f elasticsearch-exporter 2>/dev/null || true
+  docker run -d \
+    --name elasticsearch-exporter \
+    --restart unless-stopped \
+    --network host \
+    --memory 64m \
+    quay.io/prometheuscommunity/elasticsearch-exporter:v1.8.0 \
+      --es.uri="${ELASTICSEARCH_URL}" \
+      --es.all \
+      --es.indices \
+      --es.shards \
+      --web.listen-address=127.0.0.1:9114
+
+  success "elasticsearch_exporter running on :9114"
 fi
 
 # --- Install postgresqltuner (if PostgreSQL is present) ---
