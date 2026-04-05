@@ -18,7 +18,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1024M
+          memory: 2048M
 
   loki:
     image: grafana/loki:3.4.3
@@ -35,7 +35,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1024M
 
   tempo:
     image: grafana/tempo:2.7.2
@@ -78,7 +78,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 512M
 
   uptime-kuma:
     image: louislam/uptime-kuma:2
@@ -125,7 +125,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 256M
 
 volumes:
   prometheus_data:
