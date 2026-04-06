@@ -1,12 +1,11 @@
 #!/bin/bash
 
 # Monitoring Setup Script
-# Installs Grafana Alloy with built-in node exporter metrics
-# Ships metrics and Docker logs to self-hosted Prometheus/Loki
+# Installs OpenTelemetry Collector Contrib (otelcol-contrib)
+# Ships metrics, logs, and traces to self-hosted SigNoz
 #
 # Run standalone:
-#   PROMETHEUS_REMOTE_WRITE_URL=http://prometheus:9090/api/v1/write \
-#   LOKI_URL=http://loki:3100/loki/api/v1/push \
+#   SIGNOZ_ENDPOINT=http://signoz:4317 \
 #   bash setup-monitoring.sh
 #
 # Or via cloud-init (secrets loaded from /run/setup-secrets)
@@ -32,250 +31,282 @@ if [[ -f "$SECRETS_FILE" ]]; then
   source "$SECRETS_FILE"
 fi
 
-# Fall back to existing Alloy environment (from previous install)
+# Fall back to existing otelcol environment (from previous install)
+OTELCOL_ENV="/etc/otelcol-contrib/environment"
+if [[ -f "$OTELCOL_ENV" ]]; then
+  source "$OTELCOL_ENV"
+fi
+
+# Legacy: fall back to Alloy environment for migration
 ALLOY_ENV="/etc/alloy/environment"
 if [[ -f "$ALLOY_ENV" ]]; then
   source "$ALLOY_ENV"
 fi
 
-[[ -n "${PROMETHEUS_REMOTE_WRITE_URL:-}" ]] || error "PROMETHEUS_REMOTE_WRITE_URL is required"
-[[ -n "${LOKI_URL:-}" ]] || error "LOKI_URL is required"
+[[ -n "${SIGNOZ_ENDPOINT:-}" ]] || error "SIGNOZ_ENDPOINT is required (e.g. http://signoz:4317)"
 
 HAS_POSTGRES=false
 if [[ -n "${POSTGRES_DSN:-}" ]]; then
   HAS_POSTGRES=true
-  info "PostgreSQL DSN found — will enable postgres exporter"
+  info "PostgreSQL DSN found — will enable postgresql receiver"
 fi
 
 HAS_ELASTICSEARCH=false
 if [[ -n "${ELASTICSEARCH_URL:-}" ]]; then
   HAS_ELASTICSEARCH=true
-  info "Elasticsearch URL found — will enable elasticsearch exporter"
+  info "Elasticsearch URL found — will enable elasticsearch receiver"
 fi
 
-# --- Install Alloy ---
-info "Installing Grafana Alloy..."
+# --- Uninstall Grafana Alloy (if present) ---
+if systemctl is-active --quiet alloy 2>/dev/null; then
+  info "Stopping and removing Grafana Alloy..."
+  systemctl stop alloy
+  systemctl disable alloy
+  apt-get remove -y alloy 2>/dev/null || true
+  rm -rf /etc/alloy
+  rm -rf /etc/systemd/system/alloy.service.d
+  success "Alloy removed"
+fi
 
-apt-get install -y gpg
-mkdir -p /etc/apt/keyrings/
-curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor --yes -o /etc/apt/keyrings/grafana.gpg
-chmod 644 /etc/apt/keyrings/grafana.gpg
-echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" \
-  > /etc/apt/sources.list.d/grafana.list
-apt-get update
-apt-get install -y alloy
+# Remove legacy elasticsearch-exporter container (otelcol-contrib handles this natively)
+if docker ps -a --format '{{.Names}}' | grep -q '^elasticsearch-exporter$'; then
+  info "Removing legacy elasticsearch-exporter container..."
+  docker rm -f elasticsearch-exporter 2>/dev/null || true
+  success "elasticsearch-exporter removed"
+fi
 
-# --- Configure Alloy ---
-info "Configuring Alloy..."
+# --- Install otelcol-contrib ---
+info "Installing OpenTelemetry Collector Contrib..."
 
-cat > /etc/alloy/config.alloy <<'ALLOY_CONFIG'
-// --- Node metrics (built-in node exporter) ---
-prometheus.exporter.unix "node" {}
+OTELCOL_VERSION="0.120.0"
+ARCH=$(dpkg --print-architecture)
 
-prometheus.scrape "node" {
-  targets    = prometheus.exporter.unix.node.targets
-  forward_to = [prometheus.remote_write.default.receiver]
+curl -fsSL "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${OTELCOL_VERSION}/otelcol-contrib_${OTELCOL_VERSION}_linux_${ARCH}.deb" \
+  -o /tmp/otelcol-contrib.deb
+dpkg -i /tmp/otelcol-contrib.deb
+rm -f /tmp/otelcol-contrib.deb
 
-  scrape_interval = "60s"
-}
+# --- Configure otelcol-contrib ---
+info "Configuring otelcol-contrib..."
 
-// --- Docker container metrics ---
-prometheus.scrape "docker" {
-  targets = [{
-    __address__ = "127.0.0.1:9323",
-  }]
-  forward_to = [prometheus.remote_write.default.receiver]
+mkdir -p /etc/otelcol-contrib
 
-  scrape_interval = "60s"
-}
+cat > /etc/otelcol-contrib/config.yaml <<'OTELCOL_CONFIG'
+receivers:
+  # --- Host metrics (replaces node_exporter) ---
+  hostmetrics:
+    collection_interval: 60s
+    root_path: /
+    scrapers:
+      cpu: {}
+      disk: {}
+      load: {}
+      filesystem: {}
+      memory: {}
+      network: {}
+      paging: {}
+      process:
+        mute_process_name_error: true
+        mute_process_exe_error: true
+        mute_process_io_error: true
+        mute_process_user_error: true
+      processes: {}
 
-// --- PostgreSQL metrics (enabled when POSTGRES_DSN is set) ---
-ALLOY_CONFIG
+  # --- Docker container metrics ---
+  docker_stats:
+    endpoint: unix:///var/run/docker.sock
+    collection_interval: 60s
+    metrics:
+      container.cpu.utilization:
+        enabled: true
+      container.memory.percent:
+        enabled: true
+      container.memory.usage.total:
+        enabled: true
+      container.memory.usage.limit:
+        enabled: true
+      container.network.io.usage.rx_bytes:
+        enabled: true
+      container.network.io.usage.tx_bytes:
+        enabled: true
+      container.blockio.io_service_bytes_recursive:
+        enabled: true
 
+  # --- Docker container logs ---
+  filelog/docker:
+    include: [/var/lib/docker/containers/*/*-json.log]
+    start_at: end
+    include_file_name: false
+    include_file_path: true
+    operators:
+      - id: container-parser
+        type: container
+        format: docker
+        add_metadata_from_filepath: false
+
+  # --- System logs (journald) ---
+  journald:
+    directory: /var/log/journal
+    start_at: end
+
+  # --- OTLP receiver (for instrumented apps) ---
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 127.0.0.1:4317
+      http:
+        endpoint: 127.0.0.1:4318
+
+OTELCOL_CONFIG
+
+# --- Optional: PostgreSQL receiver ---
 if $HAS_POSTGRES; then
-cat >> /etc/alloy/config.alloy <<'ALLOY_POSTGRES'
-prometheus.exporter.postgres "default" {
-  data_source_names = [sys.env("POSTGRES_DSN")]
+cat >> /etc/otelcol-contrib/config.yaml <<'OTELCOL_POSTGRES'
+  # --- PostgreSQL metrics ---
+  postgresql:
+    endpoint: ${env:POSTGRES_HOST}
+    transport: tcp
+    username: ${env:POSTGRES_USER}
+    password: ${env:POSTGRES_PASSWORD}
+    databases:
+      - ${env:POSTGRES_DB}
+    collection_interval: 60s
+    tls:
+      insecure: true
 
-  enabled_collectors = ["stat_statements"]
-}
+OTELCOL_POSTGRES
+fi
 
-discovery.relabel "postgres" {
-  targets = prometheus.exporter.postgres.default.targets
+# --- Optional: Elasticsearch receiver ---
+if $HAS_ELASTICSEARCH; then
+cat >> /etc/otelcol-contrib/config.yaml <<'OTELCOL_ELASTICSEARCH'
+  # --- Elasticsearch metrics ---
+  elasticsearch:
+    endpoint: ${env:ELASTICSEARCH_URL}
+    collection_interval: 60s
+    nodes: ["_local"]
+    skip_cluster_metrics: false
 
-  rule {
-    target_label = "instance"
-    replacement  = constants.hostname
-  }
-}
+OTELCOL_ELASTICSEARCH
+fi
 
-prometheus.scrape "postgres" {
-  targets    = discovery.relabel.postgres.output
-  forward_to = [prometheus.remote_write.default.receiver]
+# --- Processors, exporters, service ---
+cat >> /etc/otelcol-contrib/config.yaml <<'OTELCOL_SERVICE'
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 512
+    spike_limit_mib: 128
+  batch:
+    send_batch_size: 1000
+    send_batch_max_size: 2048
+    timeout: 10s
+  resourcedetection:
+    detectors: [env, system, docker]
+    timeout: 2s
+    system:
+      hostname_sources: [os]
 
-  scrape_interval = "60s"
-}
-ALLOY_POSTGRES
+exporters:
+  otlp:
+    endpoint: ${env:SIGNOZ_ENDPOINT}
+    tls:
+      insecure: true
+    compression: gzip
+    sending_queue:
+      enabled: true
+      num_consumers: 10
+      queue_size: 5000
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+
+service:
+  telemetry:
+    logs:
+      encoding: json
+  pipelines:
+    metrics:
+      receivers: [otlp, hostmetrics, docker_stats]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlp]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlp]
+    logs:
+      receivers: [otlp, filelog/docker, journald]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlp]
+OTELCOL_SERVICE
+
+# Add optional receivers to metrics pipeline
+if $HAS_POSTGRES; then
+  sed -i 's/receivers: \[otlp, hostmetrics, docker_stats\]/receivers: [otlp, hostmetrics, docker_stats, postgresql]/' /etc/otelcol-contrib/config.yaml
 fi
 
 if $HAS_ELASTICSEARCH; then
-cat >> /etc/alloy/config.alloy <<'ALLOY_ELASTICSEARCH'
-// --- Elasticsearch metrics (via elasticsearch_exporter sidecar) ---
-prometheus.scrape "elasticsearch" {
-  targets = [{
-    __address__ = "127.0.0.1:9114",
-  }]
-  forward_to = [prometheus.remote_write.default.receiver]
-
-  scrape_interval = "60s"
-}
-ALLOY_ELASTICSEARCH
+  sed -i 's/receivers: \[otlp, hostmetrics, docker_stats\]/receivers: [otlp, hostmetrics, docker_stats, elasticsearch]/' /etc/otelcol-contrib/config.yaml
+  # Handle case where postgresql was already added
+  sed -i 's/receivers: \[otlp, hostmetrics, docker_stats, postgresql\]/receivers: [otlp, hostmetrics, docker_stats, postgresql, elasticsearch]/' /etc/otelcol-contrib/config.yaml
 fi
 
-cat >> /etc/alloy/config.alloy <<'ALLOY_CONFIG'
-// --- Ship metrics to Prometheus ---
-prometheus.remote_write "default" {
-  endpoint {
-    url = sys.env("PROMETHEUS_REMOTE_WRITE_URL")
-  }
+# --- Configure environment ---
+info "Setting up otelcol-contrib environment..."
 
-  external_labels = {
-    instance = constants.hostname,
-  }
-}
-
-// --- Docker container logs (via Docker API) ---
-discovery.docker "containers" {
-  host = "unix:///var/run/docker.sock"
-}
-
-discovery.relabel "docker_containers" {
-  targets = discovery.docker.containers.targets
-
-  rule {
-    source_labels = ["__meta_docker_container_name"]
-    target_label  = "container"
-  }
-}
-
-loki.source.docker "docker_logs" {
-  host       = "unix:///var/run/docker.sock"
-  targets    = discovery.relabel.docker_containers.output
-  forward_to = [loki.process.docker_logs.receiver]
-}
-
-loki.process "docker_logs" {
-  stage.docker {}
-
-  forward_to = [loki.write.default.receiver]
-}
-
-// --- System logs (auth, syslog) ---
-local.file_match "system_logs" {
-  path_targets = [{
-    __path__ = "/var/log/auth.log",
-    job       = "auth",
-  }, {
-    __path__ = "/var/log/syslog",
-    job       = "syslog",
-  }]
-}
-
-loki.source.file "system_logs" {
-  targets    = local.file_match.system_logs.targets
-  forward_to = [loki.write.default.receiver]
-}
-
-// --- Audit logs ---
-local.file_match "audit_logs" {
-  path_targets = [{
-    __path__ = "/var/log/audit/audit.log",
-    job       = "audit",
-  }]
-}
-
-loki.source.file "audit_logs" {
-  targets    = local.file_match.audit_logs.targets
-  forward_to = [loki.write.default.receiver]
-}
-
-// --- Ship logs to Loki ---
-loki.write "default" {
-  endpoint {
-    url = sys.env("LOKI_URL")
-  }
-
-  external_labels = {
-    instance = constants.hostname,
-  }
-}
-ALLOY_CONFIG
-
-# --- Configure Alloy environment ---
-info "Setting up Alloy environment..."
-
-mkdir -p /etc/alloy
-cat > /etc/alloy/environment <<EOF
-PROMETHEUS_REMOTE_WRITE_URL=${PROMETHEUS_REMOTE_WRITE_URL}
-LOKI_URL=${LOKI_URL}
+cat > /etc/otelcol-contrib/environment <<EOF
+SIGNOZ_ENDPOINT=${SIGNOZ_ENDPOINT}
 EOF
 
 if $HAS_POSTGRES; then
-  cat >> /etc/alloy/environment <<EOF
+  # Parse: postgresql://user:pass@host:port/dbname?params
+  POSTGRES_USER=$(echo "$POSTGRES_DSN" | sed -n 's|postgresql://\([^:]*\):.*|\1|p')
+  POSTGRES_PASSWORD=$(echo "$POSTGRES_DSN" | sed -n 's|postgresql://[^:]*:\([^@]*\)@.*|\1|p')
+  POSTGRES_HOST=$(echo "$POSTGRES_DSN" | sed -n 's|postgresql://[^@]*@\(.*\)/[^/]*$|\1|p')
+  POSTGRES_DB=$(echo "$POSTGRES_DSN" | sed -n 's|postgresql://[^/]*/\([^?]*\).*|\1|p')
+  cat >> /etc/otelcol-contrib/environment <<EOF
 POSTGRES_DSN=${POSTGRES_DSN}
+POSTGRES_USER=${POSTGRES_USER}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+POSTGRES_HOST=${POSTGRES_HOST}
+POSTGRES_DB=${POSTGRES_DB}
 EOF
 fi
 
 if $HAS_ELASTICSEARCH; then
-  cat >> /etc/alloy/environment <<EOF
+  cat >> /etc/otelcol-contrib/environment <<EOF
 ELASTICSEARCH_URL=${ELASTICSEARCH_URL}
 EOF
 fi
-chmod 600 /etc/alloy/environment
+
+chmod 600 /etc/otelcol-contrib/environment
 
 # Make systemd load the environment file
-mkdir -p /etc/systemd/system/alloy.service.d
-cat > /etc/systemd/system/alloy.service.d/override.conf <<EOF
+mkdir -p /etc/systemd/system/otelcol-contrib.service.d
+cat > /etc/systemd/system/otelcol-contrib.service.d/override.conf <<EOF
 [Service]
-EnvironmentFile=/etc/alloy/environment
+EnvironmentFile=/etc/otelcol-contrib/environment
 EOF
 
-# Alloy needs Docker socket access for container log collection
-usermod -aG docker alloy 2>/dev/null || true
+# otelcol-contrib needs Docker socket + journal access
+usermod -aG docker otelcol-contrib 2>/dev/null || true
+usermod -aG systemd-journal otelcol-contrib 2>/dev/null || true
 
-# --- Start Alloy ---
-info "Starting Alloy..."
+# --- Start otelcol-contrib ---
+info "Starting otelcol-contrib..."
 systemctl daemon-reload
-systemctl enable alloy
-systemctl restart alloy
+systemctl enable otelcol-contrib
+systemctl restart otelcol-contrib
 
 # --- Verify ---
-info "Verifying Alloy..."
+info "Verifying otelcol-contrib..."
 sleep 3
-if systemctl is-active --quiet alloy; then
-  success "Alloy is running"
+if systemctl is-active --quiet otelcol-contrib; then
+  success "otelcol-contrib is running"
 else
-  error "Alloy failed to start. Check: journalctl -u alloy"
-fi
-
-# --- Start elasticsearch_exporter (if Elasticsearch is present) ---
-if $HAS_ELASTICSEARCH; then
-  info "Starting elasticsearch_exporter..."
-
-  docker rm -f elasticsearch-exporter 2>/dev/null || true
-  docker run -d \
-    --name elasticsearch-exporter \
-    --restart unless-stopped \
-    --network host \
-    --memory 64m \
-    quay.io/prometheuscommunity/elasticsearch-exporter:v1.8.0 \
-      --es.uri="${ELASTICSEARCH_URL}" \
-      --es.all \
-      --es.indices \
-      --es.shards \
-      --web.listen-address=127.0.0.1:9114
-
-  success "elasticsearch_exporter running on :9114"
+  error "otelcol-contrib failed to start. Check: journalctl -u otelcol-contrib"
 fi
 
 # --- Install postgresqltuner (if PostgreSQL is present) ---
@@ -286,11 +317,11 @@ if $HAS_POSTGRES; then
     -o /usr/local/bin/postgresqltuner.pl
   chmod +x /usr/local/bin/postgresqltuner.pl
 
-  # Wrapper that reads POSTGRES_DSN from Alloy environment
+  # Wrapper that reads POSTGRES_DSN from otelcol environment
   cat > /usr/local/bin/postgresqltuner <<'WRAPPER'
 #!/bin/bash
 set -euo pipefail
-source /etc/alloy/environment
+source /etc/otelcol-contrib/environment
 # Parse: postgresql://user:pass@host:port/dbname?params
 PGUSER=$(echo "$POSTGRES_DSN" | sed -n 's|postgresql://\([^:]*\):.*|\1|p')
 PGPASS=$(echo "$POSTGRES_DSN" | sed -n 's|postgresql://[^:]*:\([^@]*\)@.*|\1|p')
@@ -304,4 +335,4 @@ WRAPPER
   success "postgresqltuner installed — run: postgresqltuner"
 fi
 
-success "Monitoring setup complete! Metrics and logs shipping to Prometheus/Loki."
+success "Monitoring setup complete! All telemetry shipping to SigNoz."
