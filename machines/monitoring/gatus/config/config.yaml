@@ -1,0 +1,70 @@
+storage:
+  type: sqlite
+  path: /data/gatus.db
+
+ui:
+  title: "Status"
+  header: "Infrastructure Status"
+
+alerting:
+  discord:
+    webhook-url: "${DISCORD_WEBHOOK_URL}"
+    default-alert:
+      failure-threshold: 3
+      success-threshold: 2
+      send-on-resolved: true
+
+endpoints:
+  # --- Nadeshiko Prod ---
+  - name: Backend Health
+    group: nadeshiko
+    url: "https://api.nadeshiko.co/up"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 72h"
+    alerts:
+      - type: discord
+
+  - name: Frontend Health
+    group: nadeshiko
+    url: "https://nadeshiko.co/up"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 72h"
+    alerts:
+      - type: discord
+
+  - name: Homepage
+    group: nadeshiko
+    url: "https://nadeshiko.co"
+    interval: 120s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+    alerts:
+      - type: discord
+
+  - name: Search Page
+    group: nadeshiko
+    url: "https://nadeshiko.co/search/hello"
+    interval: 300s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+    alerts:
+      - type: discord
+
+  # --- Nadeshiko Dev ---
+  - name: Dev Frontend
+    group: nadeshiko-dev
+    url: "https://dev.nadeshiko.co/up"
+    interval: 300s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+    alerts:
+      - type: discord

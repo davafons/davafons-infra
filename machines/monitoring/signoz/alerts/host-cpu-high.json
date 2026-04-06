@@ -1,0 +1,42 @@
+{
+  "alert": "HostCpuHigh",
+  "alertType": "METRIC_BASED_ALERT",
+  "ruleType": "threshold_rule",
+  "version": "v5",
+  "frequency": "1m",
+  "evalWindow": "5m",
+  "disabled": false,
+  "labels": { "severity": "warning" },
+  "annotations": {
+    "description": "5-minute load average on {{ .Labels.host_name }} is above 4"
+  },
+  "preferredChannels": ["discord"],
+  "condition": {
+    "compositeQuery": {
+      "queryType": "builder",
+      "panelType": "graph",
+      "builderQueries": {
+        "A": {
+          "queryName": "A",
+          "dataSource": "metrics",
+          "aggregateOperator": "latest",
+          "aggregateAttribute": {
+            "key": "system.cpu.load_average.5m",
+            "type": "Gauge",
+            "dataType": "float64"
+          },
+          "groupBy": [
+            { "key": "host.name", "type": "resource", "dataType": "string" }
+          ],
+          "filters": { "op": "AND", "items": [] },
+          "expression": "A",
+          "disabled": false
+        }
+      }
+    },
+    "op": "1",
+    "target": 4,
+    "matchType": "1",
+    "selectedQueryName": "A"
+  }
+}

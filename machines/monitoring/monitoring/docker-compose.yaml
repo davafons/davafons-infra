@@ -1,34 +1,4 @@
 services:
-  uptime-kuma:
-    image: louislam/uptime-kuma:2
-    container_name: uptime-kuma
-    restart: unless-stopped
-    volumes:
-      - uptime_kuma_data:/app/data
-    ports:
-      - "127.0.0.1:3010:3001"
-      - "${TAILSCALE_IP}:3010:3001"
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-
-  autokuma:
-    image: ghcr.io/bigboot/autokuma:latest
-    container_name: autokuma
-    restart: unless-stopped
-    environment:
-      - AUTOKUMA__KUMA__URL=http://uptime-kuma:3001
-      - AUTOKUMA__STATIC_MONITORS=/monitors
-      - AUTOKUMA__DOCKER__ENABLED=false
-      - AUTOKUMA__KUMA__USERNAME=${UPTIME_KUMA_USERNAME}
-      - AUTOKUMA__KUMA__PASSWORD=${UPTIME_KUMA_PASSWORD}
-      - AUTOKUMA__ENV__DISCORD_WEBHOOK_URL=${UPTIME_KUMA_DISCORD_WEBHOOK_URL}
-    volumes:
-      - ./config/uptime-kuma:/monitors:ro
-    depends_on:
-      - uptime-kuma
-
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: pgadmin
@@ -47,5 +17,4 @@ services:
           memory: 256M
 
 volumes:
-  uptime_kuma_data:
   pgadmin_data:

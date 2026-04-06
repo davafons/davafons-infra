@@ -1,0 +1,43 @@
+{
+  "alert": "ContainerMemoryHigh",
+  "alertType": "METRIC_BASED_ALERT",
+  "ruleType": "threshold_rule",
+  "version": "v5",
+  "frequency": "1m",
+  "evalWindow": "5m",
+  "disabled": false,
+  "labels": { "severity": "warning" },
+  "annotations": {
+    "description": "Container {{ .Labels.container_name }} on {{ .Labels.host_name }} is using more than 90% of its memory limit"
+  },
+  "preferredChannels": ["discord"],
+  "condition": {
+    "compositeQuery": {
+      "queryType": "builder",
+      "panelType": "graph",
+      "builderQueries": {
+        "A": {
+          "queryName": "A",
+          "dataSource": "metrics",
+          "aggregateOperator": "avg",
+          "aggregateAttribute": {
+            "key": "container.memory.percent",
+            "type": "Gauge",
+            "dataType": "float64"
+          },
+          "groupBy": [
+            { "key": "host.name", "type": "tag", "dataType": "string" },
+            { "key": "container.name", "type": "tag", "dataType": "string" }
+          ],
+          "filters": { "op": "AND", "items": [] },
+          "expression": "A",
+          "disabled": false
+        }
+      }
+    },
+    "op": "1",
+    "target": 90,
+    "matchType": "1",
+    "selectedQueryName": "A"
+  }
+}

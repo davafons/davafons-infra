@@ -110,12 +110,14 @@ receivers:
         mute_process_exe_error: true
         mute_process_io_error: true
         mute_process_user_error: true
+        mute_process_cgroup_error: true
       processes: {}
 
   # --- Docker container metrics ---
   docker_stats:
     endpoint: unix:///var/run/docker.sock
     collection_interval: 60s
+    api_version: "1.43"
     metrics:
       container.cpu.utilization:
         enabled: true
@@ -138,24 +140,71 @@ receivers:
     start_at: end
     include_file_name: false
     include_file_path: true
+    # Exclude noisy low-value containers by container ID directory
+    # (Filtering by name happens after parsing via the filter processor below)
     operators:
       - id: container-parser
         type: container
         format: docker
         add_metadata_from_filepath: false
+      # Tag log source
+      - type: add
+        field: attributes.log.source
+        value: docker
+      # Extract container name from Docker log tag (set via daemon.json tag option)
+      - type: move
+        if: attributes.attrs.tag != nil
+        from: attributes.attrs.tag
+        to: attributes["container.name"]
+      # Detect environment from container name (-prod or -dev suffix)
+      - type: add
+        if: attributes["container.name"] != nil and attributes["container.name"] matches "-prod"
+        field: attributes["deployment.environment"]
+        value: production
+      - type: add
+        if: attributes["container.name"] != nil and attributes["container.name"] matches "-dev"
+        field: attributes["deployment.environment"]
+        value: development
+      - type: add
+        if: attributes["deployment.environment"] == nil
+        field: attributes["deployment.environment"]
+        value: infrastructure
+      # Parse structured JSON logs (e.g. from Pino, Winston, etc.)
+      - id: json-parser
+        type: json_parser
+        if: body matches "^\\{"
+        parse_from: body
+        parse_to: attributes
+      # Map common log fields to OTel semantic conventions
+      - id: severity-parser
+        type: severity_parser
+        if: attributes.level != nil
+        parse_from: attributes.level
+        mapping:
+          trace: [trace, "10"]
+          debug: [debug, "20"]
+          info: [info, "30"]
+          warn: [warn, "40"]
+          error: [error, "50"]
+          fatal: [fatal, "60"]
 
   # --- System logs (journald) ---
   journald:
     directory: /var/log/journal
     start_at: end
+    operators:
+      - type: add
+        field: attributes.log.source
+        value: journald
 
   # --- OTLP receiver (for instrumented apps) ---
+  # Uses non-standard ports to avoid conflicts with SigNoz's otel-collector on the monitoring server
   otlp:
     protocols:
       grpc:
-        endpoint: 127.0.0.1:4317
+        endpoint: 127.0.0.1:4327
       http:
-        endpoint: 127.0.0.1:4318
+        endpoint: 127.0.0.1:4328
 
 OTELCOL_CONFIG
 
@@ -206,6 +255,12 @@ processors:
     timeout: 2s
     system:
       hostname_sources: [os]
+  # Drop logs from noisy low-value containers
+  filter/drop_noisy:
+    error_mode: ignore
+    logs:
+      log_record:
+        - 'attributes["container.name"] != nil and IsMatch(attributes["container.name"], "^(signoz-|.*redis.*|.*cloudflare.*|adminer|pgadmin|autokuma)")'
 
 exporters:
   otlp:
@@ -238,7 +293,7 @@ service:
       exporters: [otlp]
     logs:
       receivers: [otlp, filelog/docker, journald]
-      processors: [memory_limiter, resourcedetection, batch]
+      processors: [memory_limiter, resourcedetection, filter/drop_noisy, batch]
       exporters: [otlp]
 OTELCOL_SERVICE
 

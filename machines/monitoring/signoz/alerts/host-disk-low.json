@@ -1,0 +1,59 @@
+{
+  "alert": "HostDiskLow",
+  "alertType": "METRIC_BASED_ALERT",
+  "ruleType": "threshold_rule",
+  "version": "v5",
+  "frequency": "5m",
+  "evalWindow": "5m",
+  "disabled": false,
+  "labels": { "severity": "critical" },
+  "annotations": {
+    "description": "Free disk space on {{ .Labels.host_name }} ({{ .Labels.mountpoint }}) is below 5GB"
+  },
+  "preferredChannels": ["discord"],
+  "condition": {
+    "compositeQuery": {
+      "queryType": "builder",
+      "panelType": "graph",
+      "unit": "bytes",
+      "builderQueries": {
+        "A": {
+          "queryName": "A",
+          "dataSource": "metrics",
+          "aggregateOperator": "latest",
+          "aggregateAttribute": {
+            "key": "system.filesystem.usage",
+            "type": "Gauge",
+            "dataType": "float64"
+          },
+          "groupBy": [
+            { "key": "host.name", "type": "resource", "dataType": "string" },
+            { "key": "mountpoint", "type": "tag", "dataType": "string" }
+          ],
+          "filters": {
+            "op": "AND",
+            "items": [
+              {
+                "key": { "key": "state", "type": "tag", "dataType": "string" },
+                "op": "=",
+                "value": "free"
+              },
+              {
+                "key": { "key": "type", "type": "tag", "dataType": "string" },
+                "op": "nin",
+                "value": ["tmpfs", "devtmpfs", "squashfs"]
+              }
+            ]
+          },
+          "expression": "A",
+          "disabled": false
+        }
+      }
+    },
+    "op": "2",
+    "target": 5,
+    "targetUnit": "gbytes",
+    "matchType": "1",
+    "selectedQueryName": "A"
+  }
+}

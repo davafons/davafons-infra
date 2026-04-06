@@ -1,6 +1,0 @@
-type = "notification"
-active = true
-isDefault = true
-name = "discord"
-config.type = "discord"
-config.discordWebhookUrl = "{{ get_env(name='AUTOKUMA__ENV__DISCORD_WEBHOOK_URL') }}"

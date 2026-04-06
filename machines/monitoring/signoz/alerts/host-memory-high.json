@@ -1,0 +1,51 @@
+{
+  "alert": "HostMemoryHigh",
+  "alertType": "METRIC_BASED_ALERT",
+  "ruleType": "threshold_rule",
+  "version": "v5",
+  "frequency": "1m",
+  "evalWindow": "5m",
+  "disabled": false,
+  "labels": { "severity": "warning" },
+  "annotations": {
+    "description": "Memory usage on {{ .Labels.host_name }} is high (free memory below threshold)"
+  },
+  "preferredChannels": ["discord"],
+  "condition": {
+    "compositeQuery": {
+      "queryType": "builder",
+      "panelType": "graph",
+      "builderQueries": {
+        "A": {
+          "queryName": "A",
+          "dataSource": "metrics",
+          "aggregateOperator": "latest",
+          "aggregateAttribute": {
+            "key": "system.memory.usage",
+            "type": "Gauge",
+            "dataType": "float64"
+          },
+          "groupBy": [
+            { "key": "host.name", "type": "resource", "dataType": "string" }
+          ],
+          "filters": {
+            "op": "AND",
+            "items": [
+              {
+                "key": { "key": "state", "type": "tag", "dataType": "string" },
+                "op": "=",
+                "value": "free"
+              }
+            ]
+          },
+          "expression": "A",
+          "disabled": false
+        }
+      }
+    },
+    "op": "2",
+    "target": 500000000,
+    "matchType": "1",
+    "selectedQueryName": "A"
+  }
+}

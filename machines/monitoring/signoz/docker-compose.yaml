@@ -18,7 +18,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 512M
     logging:
       options:
         max-size: 50m
@@ -123,6 +123,7 @@ services:
       - signoz_sqlite_data:/var/lib/signoz/
     environment:
       - SIGNOZ_ALERTMANAGER_PROVIDER=signoz
+      - SIGNOZ_ALERTMANAGER_EXTERNAL_URL=http://monitoring:8080
       - SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_DSN=tcp://signoz-clickhouse:9000
       - SIGNOZ_SQLSTORE_SQLITE_PATH=/var/lib/signoz/signoz.db
       - SIGNOZ_TOKENIZER_JWT_SECRET=${SIGNOZ_JWT_SECRET}

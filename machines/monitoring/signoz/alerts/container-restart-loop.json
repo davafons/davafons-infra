@@ -1,0 +1,48 @@
+{
+  "alert": "ContainerRestartLoop",
+  "alertType": "LOGS_BASED_ALERT",
+  "ruleType": "threshold_rule",
+  "version": "v5",
+  "frequency": "5m",
+  "evalWindow": "15m",
+  "disabled": false,
+  "labels": { "severity": "critical" },
+  "annotations": {
+    "description": "Container {{ .Labels.container_name }} on {{ .Labels.host_name }} has restarted multiple times in 15 minutes"
+  },
+  "preferredChannels": ["discord"],
+  "condition": {
+    "compositeQuery": {
+      "queryType": "builder",
+      "panelType": "graph",
+      "builderQueries": {
+        "A": {
+          "queryName": "A",
+          "dataSource": "logs",
+          "aggregateOperator": "count",
+          "aggregateAttribute": {},
+          "groupBy": [
+            { "key": "host.name", "type": "resource", "dataType": "string" },
+            { "key": "container_name", "type": "tag", "dataType": "string" }
+          ],
+          "filters": {
+            "op": "AND",
+            "items": [
+              {
+                "key": { "key": "body", "type": "tag", "dataType": "string" },
+                "op": "contains",
+                "value": "Health check failed"
+              }
+            ]
+          },
+          "expression": "A",
+          "disabled": false
+        }
+      }
+    },
+    "op": "1",
+    "target": 5,
+    "matchType": "1",
+    "selectedQueryName": "A"
+  }
+}
