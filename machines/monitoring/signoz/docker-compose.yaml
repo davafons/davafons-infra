@@ -180,6 +180,22 @@ services:
         max-size: 50m
         max-file: "3"
 
+  alertmanager-discord:
+    image: rogerrum/alertmanager-discord:latest
+    container_name: alertmanager-discord
+    restart: unless-stopped
+    environment:
+      - DISCORD_WEBHOOK=${DISCORD_ALERT_WEBHOOK_URL}
+      - DISCORD_USERNAME=SigNoz Alerts
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    logging:
+      options:
+        max-size: 50m
+        max-file: "3"
+
 volumes:
   signoz_zookeeper_data:
   signoz_clickhouse_user_scripts:

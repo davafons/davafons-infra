@@ -37,10 +37,8 @@ ssm_get() {
 }
 
 SIGNOZ_API_KEY=$(ssm_get "SIGNOZ_API_KEY")
-export DISCORD_ALERT_WEBHOOK_URL=$(ssm_get "DISCORD_ALERT_WEBHOOK_URL")
 
 [[ -n "$SIGNOZ_API_KEY" ]] || error "SIGNOZ_API_KEY not found in SSM ($SSM_PATH/SIGNOZ_API_KEY)"
-[[ -n "$DISCORD_ALERT_WEBHOOK_URL" ]] || error "DISCORD_ALERT_WEBHOOK_URL not found in SSM ($SSM_PATH/DISCORD_ALERT_WEBHOOK_URL)"
 
 success "Secrets loaded from SSM"
 
@@ -76,9 +74,8 @@ sync_channels() {
     local name
     name=$(jq -r '.name' "$channel_file")
 
-    # Substitute environment variables in channel config
     local payload
-    payload=$(envsubst < "$channel_file")
+    payload=$(cat "$channel_file")
 
     # Check if channel already exists
     local existing_id

@@ -1,15 +1,9 @@
 {
   "name": "discord",
-  "slack_configs": [
+  "webhook_configs": [
     {
       "send_resolved": true,
-      "api_url": "${DISCORD_ALERT_WEBHOOK_URL}/slack",
-      "channel": "#alerts",
-      "title": "[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}",
-      "text": "{{ .CommonAnnotations.description }}\n\nSeverity: {{ .CommonLabels.severity }}\n{{ if .CommonLabels.ruleId }}Alert: http://monitoring:8080/alerts/edit?ruleId={{ .CommonLabels.ruleId }}{{ end }}",
-      "title_link": "http://monitoring:8080/alerts",
-      "footer": "",
-      "fallback": "{{ .CommonLabels.alertname }}: {{ .CommonAnnotations.description }}"
+      "url": "http://alertmanager-discord:9094"
     }
   ]
 }

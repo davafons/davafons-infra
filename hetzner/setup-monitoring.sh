@@ -457,7 +457,7 @@ processors:
     error_mode: ignore
     logs:
       log_record:
-        - 'attributes["container.name"] != nil and IsMatch(attributes["container.name"], "^(signoz-|.*redis.*|.*cloudflare.*|adminer|pgadmin|autokuma)")'
+        - 'attributes["container.name"] != nil and IsMatch(attributes["container.name"], "^(signoz-|.*redis.*|adminer|pgadmin|autokuma)")'
 
 exporters:
   otlp:
