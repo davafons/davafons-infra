@@ -185,7 +185,6 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     auditd \
     audispd-plugins \
     unattended-upgrades \
-    acl \
     apparmor \
     apparmor-utils \
     aide \

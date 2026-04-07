@@ -1,6 +1,7 @@
 storage:
   type: sqlite
   path: /data/gatus.db
+  number-of-results-to-keep: 132000
 
 ui:
   title: "Nadeshiko Status"
@@ -8,7 +9,10 @@ ui:
   logo: "https://nadeshiko.co/logo-38d6e06a.webp"
   link: "https://nadeshiko.co"
   dark-mode: true
-  default-sort-by: group
+  favicon:
+    default: "https://nadeshiko.co/favicon.ico"
+    size16x16: "https://nadeshiko.co/favicon.ico"
+    size32x32: "https://nadeshiko.co/favicon.ico"
 
 # Announcements are displayed at the top of the status page.
 # Types: outage, operational, information, warning
@@ -35,7 +39,7 @@ endpoints:
   - name: Homepage
     group: Nadeshiko (Web)
     url: "https://nadeshiko.co"
-    interval: 120s
+    interval: 60s
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 5000"
@@ -46,7 +50,7 @@ endpoints:
   - name: Search Page
     group: Nadeshiko (Web)
     url: "https://nadeshiko.co/search/hello"
-    interval: 300s
+    interval: 60s
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 5000"

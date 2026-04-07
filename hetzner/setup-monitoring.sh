@@ -143,26 +143,40 @@ receivers:
     # Exclude noisy low-value containers by container ID directory
     # (Filtering by name happens after parsing via the filter processor below)
     operators:
-      - id: container-parser
-        type: container
-        format: docker
-        add_metadata_from_filepath: false
+      # Parse the Docker JSON log wrapper manually instead of using the built-in
+      # 'container' operator, which fails when daemon.json sets a "tag" log-opt
+      # (Docker adds an "attrs" field that the operator's regex doesn't expect)
+      - id: docker-json-parser
+        type: json_parser
+        parse_from: body
+        parse_to: attributes._docker
+      - type: move
+        from: attributes._docker.log
+        to: body
+      - type: move
+        if: attributes._docker.stream != nil
+        from: attributes._docker.stream
+        to: attributes["log.iostream"]
+      - id: docker-time-parser
+        type: time_parser
+        parse_from: attributes._docker.time
+        layout_type: gotime
+        layout: '2006-01-02T15:04:05.999999999Z'
+      # Extract container name from Docker log tag (set via daemon.json tag option)
+      - type: move
+        if: attributes._docker.attrs != nil and attributes._docker.attrs.tag != nil
+        from: attributes._docker.attrs.tag
+        to: resource["container.name"]
+      - type: remove
+        field: attributes._docker
       # Tag log source
       - type: add
         field: attributes.log.source
         value: docker
-      # Extract container name from Docker log tag (set via daemon.json tag option)
-      - type: move
-        if: attributes.attrs != nil and attributes.attrs.tag != nil
-        from: attributes.attrs.tag
-        to: resource["container.name"]
-      - type: remove
-        if: attributes.attrs != nil
-        field: attributes.attrs
       # Set service.name from container name, stripping the Kamal deploy hash
       # e.g. "nadeshiko-backend-dev-web-dev-6a775c7e..." -> "nadeshiko-backend-dev-web-dev"
       - type: regex_parser
-        if: resource["container.name"] != nil
+        if: resource["container.name"] != nil and resource["container.name"] matches "-[0-9a-f]{10,}$"
         parse_from: resource["container.name"]
         regex: '^(?P<service_name>.+)-[0-9a-f]{10,}$'
         parse_to: resource
@@ -188,39 +202,88 @@ receivers:
         if: resource["deployment.environment"] == nil
         field: resource["deployment.environment"]
         value: infrastructure
-      # Parse structured JSON logs (e.g. from Pino, Winston, etc.)
-      # Preserve the raw JSON before parsing overwrites fields
-      - type: copy
+      # Route logs by container type for format-specific parsing
+      - type: router
+        routes:
+          - output: kamal-proxy-raw-copy
+            expr: 'resource["container.name"] == "kamal-proxy" and body matches "^\\{"'
+        default: json-raw-copy
+
+      # === Kamal-proxy branch ===
+      # Parses JSON logs from kamal-proxy and sets body to "METHOD /path STATUS"
+      - id: kamal-proxy-raw-copy
+        type: copy
+        from: body
+        to: attributes["log.raw"]
+        output: kamal-proxy-json-parser
+      - id: kamal-proxy-json-parser
+        type: json_parser
+        parse_from: body
+        parse_to: attributes
+        output: kamal-proxy-set-body
+      # Set body to "METHOD /path STATUS" for readability
+      - id: kamal-proxy-set-body
+        type: add
+        if: 'attributes.method != nil and attributes.path != nil and attributes.status != nil'
+        field: body
+        value: EXPR(attributes.method + " " + attributes.path)
+        output: kamal-proxy-fallback-body
+      - id: kamal-proxy-fallback-body
+        type: move
+        if: 'attributes.method == nil and attributes.msg != nil'
+        from: attributes.msg
+        to: body
+        output: kamal-proxy-remove-msg
+      - id: kamal-proxy-remove-msg
+        type: remove
+        if: 'attributes.msg != nil'
+        field: attributes.msg
+        output: kamal-proxy-remove-dup-ua
+      - id: kamal-proxy-remove-dup-ua
+        type: remove
+        if: 'attributes.req_user_agent != nil'
+        field: attributes.req_user_agent
+        output: severity-parser
+
+      # === Default branch: structured JSON logs (Pino, Winston, etc.) ===
+      - id: json-raw-copy
+        type: copy
         if: body matches "^\\{"
         from: body
         to: attributes["log.raw"]
+        output: json-parser
       - id: json-parser
         type: json_parser
         if: body matches "^\\{"
         parse_from: body
         parse_to: attributes
-      # Use the message field as the log body for readability
-      - type: move
+        output: json-move-msg
+      - id: json-move-msg
+        type: move
         if: attributes.msg != nil
         from: attributes.msg
         to: body
-      - type: move
-        if: attributes.message != nil and attributes.msg == nil
+        output: json-move-message
+      - id: json-move-message
+        type: move
+        if: 'attributes.message != nil and body == nil'
         from: attributes.message
         to: body
-      # Map severity before removing the level field
+        output: severity-parser
+
+      # === Shared cleanup (both branches converge here) ===
       - id: severity-parser
         type: severity_parser
         if: attributes.level != nil
         parse_from: attributes.level
+        overwrite_text: true
         mapping:
           trace: [trace, TRACE, "10"]
-          debug: [debug, DEBUG, "20"]
-          info: [info, INFO, "30"]
-          warn: [warn, WARN, WARNING, warning, "40"]
-          error: [error, ERROR, "50"]
-          fatal: [fatal, FATAL, "60"]
-      # Remove redundant/noisy fields parsed from JSON
+          debug: [debug, DEBUG, Debug, "20"]
+          info: [info, INFO, Information, "30"]
+          warn: [warn, WARN, WARNING, warning, Warning, "40"]
+          error: [error, ERROR, Error, "50"]
+          fatal: [fatal, FATAL, Fatal, "60"]
       - type: remove
         if: attributes.level != nil
         field: attributes.level
@@ -290,12 +353,13 @@ receivers:
 
   # --- OTLP receiver (for instrumented apps) ---
   # Uses non-standard ports to avoid conflicts with SigNoz's otel-collector on the monitoring server
+  # Listens on 0.0.0.0 so Docker containers on bridge networks can reach it via host.docker.internal
   otlp:
     protocols:
       grpc:
-        endpoint: 127.0.0.1:4327
+        endpoint: 0.0.0.0:4327
       http:
-        endpoint: 127.0.0.1:4328
+        endpoint: 0.0.0.0:4328
 
 OTELCOL_CONFIG
 
@@ -351,6 +415,43 @@ processors:
           enabled: true
         os.type:
           enabled: false
+  # Normalize high-cardinality span names (collapse IDs into placeholders)
+  transform/normalize_spans:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - replace_pattern(name, "/_nuxt/builds/meta/[^/]+\\\\.json", "/_nuxt/builds/meta/:hash.json")
+          - replace_pattern(name, "/v1/media/segments/[^/]+", "/v1/media/segments/:uuid")
+          - replace_pattern(name, "/v1/collections/[^/]+", "/v1/collections/:id")
+  # Drop health check and static asset traces before sampling
+  filter/drop_health:
+    error_mode: ignore
+    traces:
+      span:
+        - 'name == "GET /up"'
+        - 'IsMatch(name, "^GET /_nuxt/.*")'
+        - 'attributes["http.route"] == "/up"'
+        - 'IsMatch(attributes["http.route"], "^/_nuxt/.*")'
+  # Tail-based sampling: keep 100% errors + slow traces, 25% everything else
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 1000
+    expected_new_traces_per_sec: 15
+    policies:
+      - name: errors-always
+        type: status_code
+        status_code:
+          status_codes:
+            - ERROR
+      - name: slow-traces
+        type: latency
+        latency:
+          threshold_ms: 2000
+      - name: probabilistic-catchall
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 25
   # Drop logs from noisy low-value containers
   filter/drop_noisy:
     error_mode: ignore
@@ -385,7 +486,7 @@ service:
       exporters: [otlp]
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, batch]
+      processors: [memory_limiter, resourcedetection, filter/drop_health, transform/normalize_spans, tail_sampling, batch]
       exporters: [otlp]
     logs:
       receivers: [otlp, filelog/docker, journald]
@@ -439,25 +540,16 @@ mkdir -p /etc/systemd/system/otelcol-contrib.service.d
 cat > /etc/systemd/system/otelcol-contrib.service.d/override.conf <<EOF
 [Service]
 EnvironmentFile=/etc/otelcol-contrib/environment
+AmbientCapabilities=CAP_DAC_READ_SEARCH
 EOF
 
-# otelcol-contrib needs Docker socket + journal access
+# otelcol-contrib needs Docker socket access for docker_stats receiver
 usermod -aG docker otelcol-contrib 2>/dev/null || true
 usermod -aG systemd-journal otelcol-contrib 2>/dev/null || true
 
-# Grant otelcol-contrib read access to Docker container logs
-# Docker owns /var/lib/docker as root:root with 0710, so group membership isn't enough
-# IMPORTANT: Setting default ACLs replaces the standard permission model for new files.
-# We must explicitly preserve other::r-x so containers running as non-root (e.g. cloudflared)
-# can still read Docker-generated files like /etc/resolv.conf inside their containers.
-setfacl -m u:otelcol-contrib:x /var/lib/docker/ 2>/dev/null || true
-setfacl -R -m u:otelcol-contrib:rX /var/lib/docker/containers/ 2>/dev/null || true
-setfacl -R -d -m u:otelcol-contrib:rX,o::r-x /var/lib/docker/containers/ 2>/dev/null || true
-# Fix existing files that may have inherited restrictive ACLs
-setfacl -R -m o::r /var/lib/docker/containers/ 2>/dev/null || true
-# Remove stale Alloy ACL entries if present
-setfacl -R -x u:alloy /var/lib/docker/containers/ 2>/dev/null || true
-setfacl -R -d -x u:alloy /var/lib/docker/containers/ 2>/dev/null || true
+# --- Allow Docker containers to reach otelcol-contrib OTLP ports ---
+ufw allow from 172.16.0.0/12 to any port 4327 proto tcp comment 'Docker to otelcol-contrib gRPC' 2>/dev/null || true
+ufw allow from 172.16.0.0/12 to any port 4328 proto tcp comment 'Docker to otelcol-contrib HTTP' 2>/dev/null || true
 
 # --- Start otelcol-contrib ---
 info "Starting otelcol-contrib..."

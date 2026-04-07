@@ -286,7 +286,7 @@
          It is not practical to set this constraint to small values like just a few gigabytes,
           because memory allocator will keep this amount of memory in caches and the server will deny service of queries.
       -->
-    <max_server_memory_usage>0</max_server_memory_usage>
+    <max_server_memory_usage>3221225472</max_server_memory_usage>
 
     <!-- Maximum number of threads in the Global thread pool.
     This will default to a maximum of 10000 threads if not specified.
@@ -332,13 +332,13 @@
          is slower than multi-core decompression on some server configurations.
          Enabling it can sometimes paradoxically make queries slower.
       -->
-    <uncompressed_cache_size>8589934592</uncompressed_cache_size>
+    <uncompressed_cache_size>268435456</uncompressed_cache_size>
 
     <!-- Approximate size of mark cache, used in tables of MergeTree family.
          In bytes. Cache is single for server. Memory is allocated only on demand.
          You should not lower this value.
       -->
-    <mark_cache_size>5368709120</mark_cache_size>
+    <mark_cache_size>1073741824</mark_cache_size>
 
 
     <!-- If you enable the `min_bytes_to_use_mmap_io` setting,

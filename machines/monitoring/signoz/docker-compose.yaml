@@ -148,6 +148,8 @@ services:
     depends_on:
       signoz-clickhouse:
         condition: service_healthy
+    dns:
+      - 127.0.0.11
     entrypoint: ["/bin/sh"]
     command:
       - -c

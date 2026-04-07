@@ -2,7 +2,7 @@
 <clickhouse>
     <profiles>
         <default>
-            <max_memory_usage>10000000000</max_memory_usage>
+            <max_memory_usage>1073741824</max_memory_usage>
             <load_balancing>random</load_balancing>
         </default>
         <readonly>

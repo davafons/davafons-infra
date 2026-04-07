@@ -8,8 +8,6 @@ services:
       - "${TAILSCALE_IP}:3011:8080"
     volumes:
       - ./config:/config:ro
-      - ./custom.css:/web/css/custom.css:ro
-      - ./favicon.ico:/web/favicon.ico:ro
       - gatus_data:/data
     environment:
       - DISCORD_WEBHOOK_URL=${DISCORD_ALERT_WEBHOOK_URL}
