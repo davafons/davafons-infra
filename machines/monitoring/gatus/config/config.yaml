@@ -7,6 +7,7 @@ ui:
   header: "Nadeshiko Status"
   logo: "https://nadeshiko.co/logo-38d6e06a.webp"
   link: "https://nadeshiko.co"
+  dark-mode: true
   default-sort-by: group
 
 # Announcements are displayed at the top of the status page.
@@ -30,41 +31,20 @@ alerting:
       send-on-resolved: true
 
 endpoints:
-  # --- Nadeshiko Prod ---
-  - name: Backend Health
-    group: nadeshiko
-    url: "https://api.nadeshiko.co/up"
-    interval: 60s
-    conditions:
-      - "[STATUS] == 200"
-      - "[RESPONSE_TIME] < 5000"
-      - "[CERTIFICATE_EXPIRATION] > 72h"
-    alerts:
-      - type: discord
-
-  - name: Frontend Health
-    group: nadeshiko
-    url: "https://nadeshiko.co/up"
-    interval: 60s
-    conditions:
-      - "[STATUS] == 200"
-      - "[RESPONSE_TIME] < 5000"
-      - "[CERTIFICATE_EXPIRATION] > 72h"
-    alerts:
-      - type: discord
-
+  # --- Nadeshiko (Web) ---
   - name: Homepage
-    group: nadeshiko
+    group: Nadeshiko (Web)
     url: "https://nadeshiko.co"
     interval: 120s
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 72h"
     alerts:
       - type: discord
 
   - name: Search Page
-    group: nadeshiko
+    group: Nadeshiko (Web)
     url: "https://nadeshiko.co/search/hello"
     interval: 300s
     conditions:
@@ -73,13 +53,14 @@ endpoints:
     alerts:
       - type: discord
 
-  # --- Nadeshiko Dev ---
-  - name: Dev Frontend
-    group: nadeshiko-dev
-    url: "https://dev.nadeshiko.co/up"
-    interval: 300s
+  # --- Nadeshiko (API) ---
+  - name: API Health
+    group: Nadeshiko (API)
+    url: "https://api.nadeshiko.co/up"
+    interval: 60s
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 72h"
     alerts:
       - type: discord

@@ -1,0 +1,5 @@
+/* Custom dark mode background */
+.dark body,
+.dark #app {
+  background-color: #5c5c5c;
+}
