@@ -286,7 +286,7 @@
          It is not practical to set this constraint to small values like just a few gigabytes,
           because memory allocator will keep this amount of memory in caches and the server will deny service of queries.
       -->
-    <max_server_memory_usage>3221225472</max_server_memory_usage>
+    <max_server_memory_usage>4831838208</max_server_memory_usage>
 
     <!-- Maximum number of threads in the Global thread pool.
     This will default to a maximum of 10000 threads if not specified.
@@ -983,11 +983,12 @@
     </distributed_ddl>
 
     <!-- Settings to fine tune MergeTree tables. See documentation in source code, in MergeTreeSettings.h -->
-    <!--
     <merge_tree>
         <max_suspicious_broken_parts>5</max_suspicious_broken_parts>
+        <!-- Limit concurrent merges to reduce peak memory on 4GB container -->
+        <number_of_free_entries_in_pool_to_lower_max_size_of_merge>0</number_of_free_entries_in_pool_to_lower_max_size_of_merge>
+        <max_bytes_to_merge_at_max_space_in_pool>1073741824</max_bytes_to_merge_at_max_space_in_pool>
     </merge_tree>
-    -->
 
     <!-- Protection from accidental DROP.
          If size of a MergeTree table is greater than max_table_size_to_drop (in bytes) than table could not be dropped with any DROP query.
