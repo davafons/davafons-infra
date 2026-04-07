@@ -31,19 +31,19 @@
 		},
 
 		// Nadeshiko users can access monitoring services
-		// Grafana (3000), Nadeshiko Status (3011), pgAdmin (5050), Prometheus (9090)
+		// SigNoz (8080), Nadeshiko Status (3011), pgAdmin (5050)
 		{
 			"src": ["group:nadeshiko-users"],
 			"dst": ["tag:monitoring"],
-			"ip":  ["3000", "3011", "5050", "9090"],
+			"ip":  ["8080", "3011", "5050"],
 		},
 
 		// All service servers can push metrics/logs/traces to monitoring
-		// Prometheus (9090), Loki (3100), Tempo gRPC (4317), Tempo HTTP (4318)
+		// OTLP gRPC (4317), OTLP HTTP (4318)
 		{
 			"src": ["tag:nadeshiko", "tag:inari", "tag:qtower"],
 			"dst": ["tag:monitoring"],
-			"ip":  ["9090", "3100", "4317", "4318"],
+			"ip":  ["4317", "4318"],
 		},
 
 		// CI can reach all servers for deployments (SSH only)
@@ -112,24 +112,24 @@
 		// Nadeshiko user can reach nadeshiko and monitoring services
 		{
 			"src":    "group:nadeshiko-users",
-			"accept": ["tag:nadeshiko:443", "tag:monitoring:3000", "tag:monitoring:3011", "tag:monitoring:5050", "tag:monitoring:9090"],
+			"accept": ["tag:nadeshiko:443", "tag:monitoring:8080", "tag:monitoring:3011", "tag:monitoring:5050"],
 			"deny":   ["tag:inari:443", "tag:monitoring:443", "tag:qtower:443"],
 		},
 		// Servers can push metrics/logs/traces to monitoring (specific ports only)
 		{
 			"src":    "tag:nadeshiko",
-			"accept": ["tag:monitoring:9090", "tag:monitoring:3100", "tag:monitoring:4317", "tag:monitoring:4318"],
-			"deny":   ["tag:inari:443", "tag:monitoring:3000", "tag:monitoring:443"],
+			"accept": ["tag:monitoring:4317", "tag:monitoring:4318"],
+			"deny":   ["tag:inari:443", "tag:monitoring:8080", "tag:monitoring:443"],
 		},
 		{
 			"src":    "tag:inari",
-			"accept": ["tag:monitoring:9090", "tag:monitoring:3100", "tag:monitoring:4317", "tag:monitoring:4318"],
-			"deny":   ["tag:nadeshiko:443", "tag:monitoring:3000", "tag:monitoring:443"],
+			"accept": ["tag:monitoring:4317", "tag:monitoring:4318"],
+			"deny":   ["tag:nadeshiko:443", "tag:monitoring:8080", "tag:monitoring:443"],
 		},
 		{
 			"src":    "tag:qtower",
-			"accept": ["tag:monitoring:9090", "tag:monitoring:3100", "tag:monitoring:4317", "tag:monitoring:4318"],
-			"deny":   ["tag:nadeshiko:443", "tag:inari:443", "tag:monitoring:3000"],
+			"accept": ["tag:monitoring:4317", "tag:monitoring:4318"],
+			"deny":   ["tag:nadeshiko:443", "tag:inari:443", "tag:monitoring:8080"],
 		},
 		// Monitoring can reach specific admin ports on service servers
 		{
