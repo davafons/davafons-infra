@@ -301,6 +301,12 @@ log "Configuring Docker..."
 mkdir -p /etc/docker
 install -m 644 "$CONFIG_DIR/daemon.json" /etc/docker/daemon.json
 
+# Docker needs standard umask (0022) so container files like /etc/resolv.conf
+# are world-readable. Without this, non-root containers (e.g. kamal-proxy)
+# can't resolve DNS because Go's resolver can't read /etc/resolv.conf.
+mkdir -p /etc/systemd/system/docker.service.d
+printf '[Service]\nUMask=0022\n' > /etc/systemd/system/docker.service.d/umask.conf
+
 # --- User Setup ---
 if ! id docker &>/dev/null; then
   log "Creating docker user..."

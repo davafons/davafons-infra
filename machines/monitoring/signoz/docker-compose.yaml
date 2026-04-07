@@ -79,7 +79,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1536M
+          memory: 4096M
     logging:
       options:
         max-size: 50m

@@ -1,11 +1,11 @@
 services:
-  gatus:
+  nadeshiko-status:
     image: ghcr.io/twin/gatus:stable
-    container_name: gatus
+    container_name: nadeshiko-status
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3010:8080"
-      - "${TAILSCALE_IP}:3010:8080"
+      - "127.0.0.1:3011:8080"
+      - "${TAILSCALE_IP}:3011:8080"
     volumes:
       - ./config:/config:ro
       - gatus_data:/data

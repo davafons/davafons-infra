@@ -153,40 +153,102 @@ receivers:
         value: docker
       # Extract container name from Docker log tag (set via daemon.json tag option)
       - type: move
-        if: attributes.attrs.tag != nil
+        if: attributes.attrs != nil and attributes.attrs.tag != nil
         from: attributes.attrs.tag
-        to: attributes["container.name"]
+        to: resource["container.name"]
+      - type: remove
+        if: attributes.attrs != nil
+        field: attributes.attrs
+      # Set service.name from container name, stripping the Kamal deploy hash
+      # e.g. "nadeshiko-backend-dev-web-dev-6a775c7e..." -> "nadeshiko-backend-dev-web-dev"
+      - type: regex_parser
+        if: resource["container.name"] != nil
+        parse_from: resource["container.name"]
+        regex: '^(?P<service_name>.+)-[0-9a-f]{10,}$'
+        parse_to: resource
+      - type: move
+        if: resource.service_name != nil
+        from: resource.service_name
+        to: resource["service.name"]
+      # Fallback: use full container name if regex didn't match (non-Kamal containers)
+      - type: copy
+        if: resource["service.name"] == nil and resource["container.name"] != nil
+        from: resource["container.name"]
+        to: resource["service.name"]
       # Detect environment from container name (-prod or -dev suffix)
       - type: add
-        if: attributes["container.name"] != nil and attributes["container.name"] matches "-prod"
-        field: attributes["deployment.environment"]
+        if: resource["container.name"] != nil and resource["container.name"] matches "-prod"
+        field: resource["deployment.environment"]
         value: production
       - type: add
-        if: attributes["container.name"] != nil and attributes["container.name"] matches "-dev"
-        field: attributes["deployment.environment"]
+        if: resource["container.name"] != nil and resource["container.name"] matches "-dev"
+        field: resource["deployment.environment"]
         value: development
       - type: add
-        if: attributes["deployment.environment"] == nil
-        field: attributes["deployment.environment"]
+        if: resource["deployment.environment"] == nil
+        field: resource["deployment.environment"]
         value: infrastructure
       # Parse structured JSON logs (e.g. from Pino, Winston, etc.)
+      # Preserve the raw JSON before parsing overwrites fields
+      - type: copy
+        if: body matches "^\\{"
+        from: body
+        to: attributes["log.raw"]
       - id: json-parser
         type: json_parser
         if: body matches "^\\{"
         parse_from: body
         parse_to: attributes
-      # Map common log fields to OTel semantic conventions
+      # Use the message field as the log body for readability
+      - type: move
+        if: attributes.msg != nil
+        from: attributes.msg
+        to: body
+      - type: move
+        if: attributes.message != nil and attributes.msg == nil
+        from: attributes.message
+        to: body
+      # Map severity before removing the level field
       - id: severity-parser
         type: severity_parser
         if: attributes.level != nil
         parse_from: attributes.level
         mapping:
-          trace: [trace, "10"]
-          debug: [debug, "20"]
-          info: [info, "30"]
-          warn: [warn, "40"]
-          error: [error, "50"]
-          fatal: [fatal, "60"]
+          trace: [trace, TRACE, "10"]
+          debug: [debug, DEBUG, "20"]
+          info: [info, INFO, "30"]
+          warn: [warn, WARN, WARNING, warning, "40"]
+          error: [error, ERROR, "50"]
+          fatal: [fatal, FATAL, "60"]
+      # Remove redundant/noisy fields parsed from JSON
+      - type: remove
+        if: attributes.level != nil
+        field: attributes.level
+      - type: remove
+        if: attributes.time != nil
+        field: attributes.time
+      - type: remove
+        if: attributes.pid != nil
+        field: attributes.pid
+      - type: remove
+        if: attributes.hostname != nil
+        field: attributes.hostname
+      - type: remove
+        if: attributes.attrs != nil
+        field: attributes.attrs
+      # Correlate logs with traces (Pino injects traceId/spanId via OTel mixin)
+      - type: trace_parser
+        if: attributes.traceId != nil
+        trace_id:
+          parse_from: attributes.traceId
+        span_id:
+          parse_from: attributes.spanId
+      - type: remove
+        if: attributes.traceId != nil
+        field: attributes.traceId
+      - type: remove
+        if: attributes.spanId != nil
+        field: attributes.spanId
 
   # --- System logs (journald) ---
   journald:
@@ -196,6 +258,35 @@ receivers:
       - type: add
         field: attributes.log.source
         value: journald
+      # journald receiver already parses body into a map -- extract fields directly
+      - type: move
+        if: body.SYSLOG_IDENTIFIER != nil
+        from: body.SYSLOG_IDENTIFIER
+        to: attributes["syslog.identifier"]
+      - type: move
+        if: body._SYSTEMD_UNIT != nil
+        from: body._SYSTEMD_UNIT
+        to: attributes["systemd.unit"]
+      - type: move
+        if: body._CMDLINE != nil
+        from: body._CMDLINE
+        to: attributes["process.command_line"]
+      - type: severity_parser
+        if: body.PRIORITY != nil
+        parse_from: body.PRIORITY
+        preset: none
+        mapping:
+          fatal: ["0", "1", "2"]
+          error: ["3"]
+          warn: ["4"]
+          info: ["5", "6"]
+          debug: ["7"]
+        overwrite_text: true
+      # Replace body map with just the message string
+      - type: move
+        if: body.MESSAGE != nil
+        from: body.MESSAGE
+        to: body
 
   # --- OTLP receiver (for instrumented apps) ---
   # Uses non-standard ports to avoid conflicts with SigNoz's otel-collector on the monitoring server
@@ -255,6 +346,11 @@ processors:
     timeout: 2s
     system:
       hostname_sources: [os]
+      resource_attributes:
+        host.name:
+          enabled: true
+        os.type:
+          enabled: false
   # Drop logs from noisy low-value containers
   filter/drop_noisy:
     error_mode: ignore
@@ -348,6 +444,20 @@ EOF
 # otelcol-contrib needs Docker socket + journal access
 usermod -aG docker otelcol-contrib 2>/dev/null || true
 usermod -aG systemd-journal otelcol-contrib 2>/dev/null || true
+
+# Grant otelcol-contrib read access to Docker container logs
+# Docker owns /var/lib/docker as root:root with 0710, so group membership isn't enough
+# IMPORTANT: Setting default ACLs replaces the standard permission model for new files.
+# We must explicitly preserve other::r-x so containers running as non-root (e.g. cloudflared)
+# can still read Docker-generated files like /etc/resolv.conf inside their containers.
+setfacl -m u:otelcol-contrib:x /var/lib/docker/ 2>/dev/null || true
+setfacl -R -m u:otelcol-contrib:rX /var/lib/docker/containers/ 2>/dev/null || true
+setfacl -R -d -m u:otelcol-contrib:rX,o::r-x /var/lib/docker/containers/ 2>/dev/null || true
+# Fix existing files that may have inherited restrictive ACLs
+setfacl -R -m o::r /var/lib/docker/containers/ 2>/dev/null || true
+# Remove stale Alloy ACL entries if present
+setfacl -R -x u:alloy /var/lib/docker/containers/ 2>/dev/null || true
+setfacl -R -d -x u:alloy /var/lib/docker/containers/ 2>/dev/null || true
 
 # --- Start otelcol-contrib ---
 info "Starting otelcol-contrib..."

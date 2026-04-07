@@ -3,8 +3,23 @@ storage:
   path: /data/gatus.db
 
 ui:
-  title: "Status"
-  header: "Infrastructure Status"
+  title: "Nadeshiko Status"
+  header: "Nadeshiko Status"
+  logo: "https://nadeshiko.co/logo-38d6e06a.webp"
+  link: "https://nadeshiko.co"
+  default-sort-by: group
+
+# Announcements are displayed at the top of the status page.
+# Types: outage, operational, information, warning
+# Add "archived: true" to move to the bottom of the page.
+#
+# announcements:
+#   - timestamp: 2026-04-07T14:00:00Z
+#     type: outage
+#     message: "Scheduled maintenance from 14:00 to 16:00 UTC"
+#   - timestamp: 2026-04-07T16:15:00Z
+#     type: operational
+#     message: "Maintenance completed. All systems operational."
 
 alerting:
   discord:
