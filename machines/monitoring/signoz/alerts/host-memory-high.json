@@ -8,13 +8,14 @@
   "disabled": false,
   "labels": { "severity": "warning" },
   "annotations": {
-    "description": "Memory usage on {{ .Labels.host_name }} is high (free memory below threshold)"
+    "description": "Memory usage on {{ .Labels.host_name }} is above 80%"
   },
   "preferredChannels": ["discord"],
   "condition": {
     "compositeQuery": {
       "queryType": "builder",
       "panelType": "graph",
+      "unit": "percent",
       "builderQueries": {
         "A": {
           "queryName": "A",
@@ -22,7 +23,7 @@
           "aggregateOperator": "latest",
           "aggregateAttribute": {
             "key": "system.memory.usage",
-            "type": "Gauge",
+            "type": "Sum",
             "dataType": "float64"
           },
           "groupBy": [
@@ -34,18 +35,40 @@
               {
                 "key": { "key": "state", "type": "tag", "dataType": "string" },
                 "op": "=",
-                "value": "free"
+                "value": "used"
               }
             ]
           },
           "expression": "A",
           "disabled": false
+        },
+        "B": {
+          "queryName": "B",
+          "dataSource": "metrics",
+          "aggregateOperator": "latest",
+          "aggregateAttribute": {
+            "key": "system.memory.usage",
+            "type": "Sum",
+            "dataType": "float64"
+          },
+          "groupBy": [
+            { "key": "host.name", "type": "resource", "dataType": "string" }
+          ],
+          "filters": { "op": "AND", "items": [] },
+          "expression": "B",
+          "disabled": false
+        },
+        "F1": {
+          "queryName": "F1",
+          "dataSource": "metrics",
+          "expression": "A * 100 / B",
+          "disabled": false
         }
       }
     },
-    "op": "2",
-    "target": 500000000,
+    "op": "1",
+    "target": 80,
     "matchType": "1",
-    "selectedQueryName": "A"
+    "selectedQueryName": "F1"
   }
 }

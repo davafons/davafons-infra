@@ -40,6 +40,8 @@ endpoints:
     group: Nadeshiko (Web)
     url: "https://nadeshiko.co"
     interval: 60s
+    headers:
+      User-Agent: "Gatus/1.0"
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 5000"
@@ -51,6 +53,8 @@ endpoints:
     group: Nadeshiko (Web)
     url: "https://nadeshiko.co/search/hello"
     interval: 60s
+    headers:
+      User-Agent: "Gatus/1.0"
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 5000"
@@ -62,6 +66,8 @@ endpoints:
     group: Nadeshiko (API)
     url: "https://api.nadeshiko.co/up"
     interval: 60s
+    headers:
+      User-Agent: "Gatus/1.0"
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 5000"

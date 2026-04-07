@@ -8,13 +8,14 @@
   "disabled": false,
   "labels": { "severity": "warning" },
   "annotations": {
-    "description": "Container {{ .Labels.container_name }} on {{ .Labels.host_name }} is using more than 90% of its memory limit"
+    "description": "Container {{ .Labels.container_name }} on {{ .Labels.host_name }} is using more than 80% of its memory limit"
   },
   "preferredChannels": ["discord"],
   "condition": {
     "compositeQuery": {
       "queryType": "builder",
       "panelType": "graph",
+      "unit": "percent",
       "builderQueries": {
         "A": {
           "queryName": "A",
@@ -26,8 +27,8 @@
             "dataType": "float64"
           },
           "groupBy": [
-            { "key": "host.name", "type": "tag", "dataType": "string" },
-            { "key": "container.name", "type": "tag", "dataType": "string" }
+            { "key": "host.name", "type": "resource", "dataType": "string" },
+            { "key": "container.name", "type": "resource", "dataType": "string" }
           ],
           "filters": { "op": "AND", "items": [] },
           "expression": "A",
@@ -36,7 +37,7 @@
       }
     },
     "op": "1",
-    "target": 90,
+    "target": 80,
     "matchType": "1",
     "selectedQueryName": "A"
   }
