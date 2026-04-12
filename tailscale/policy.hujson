@@ -11,6 +11,7 @@
 		"tag:inari":    ["autogroup:admin"],
 		"tag:monitoring":  ["autogroup:admin"],
 		"tag:qtower":        ["autogroup:admin"],
+		"tag:watchtower":  ["autogroup:admin"],
 		"tag:ci":          ["autogroup:admin"],
 	},
 
@@ -40,7 +41,7 @@
 		// All service servers can push metrics/logs/traces to monitoring
 		// OTLP gRPC (4317), OTLP HTTP (4318)
 		{
-			"src": ["tag:nadeshiko", "tag:inari", "tag:qtower"],
+			"src": ["tag:nadeshiko", "tag:inari", "tag:qtower", "tag:watchtower"],
 			"dst": ["tag:monitoring"],
 			"ip":  ["4317", "4318"],
 		},
@@ -98,7 +99,7 @@
 		// Admin can reach everything
 		{
 			"src":    "davafons@gmail.com",
-			"accept": ["tag:nadeshiko:443", "tag:inari:443", "tag:monitoring:443", "tag:qtower:443"],
+			"accept": ["tag:nadeshiko:443", "tag:inari:443", "tag:monitoring:443", "tag:qtower:443", "tag:watchtower:443"],
 		},
 		// Nadeshiko user can reach nadeshiko and monitoring services
 		{
@@ -121,6 +122,11 @@
 			"src":    "tag:qtower",
 			"accept": ["tag:monitoring:4317", "tag:monitoring:4318"],
 			"deny":   ["tag:nadeshiko:443", "tag:inari:443", "tag:monitoring:8080"],
+		},
+		{
+			"src":    "tag:watchtower",
+			"accept": ["tag:monitoring:4317", "tag:monitoring:4318"],
+			"deny":   ["tag:nadeshiko:443", "tag:inari:443", "tag:qtower:443", "tag:monitoring:8080"],
 		},
 		// Monitoring can reach specific admin ports on service servers
 		{
