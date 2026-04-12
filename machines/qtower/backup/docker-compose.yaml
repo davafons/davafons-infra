@@ -1,0 +1,37 @@
+services:
+  restic:
+    build: .
+    container_name: restic-backup
+    entrypoint: /scripts/backup.sh
+    restart: unless-stopped
+    environment:
+      - RESTIC_REPOSITORY=/repo
+      - RESTIC_PASSWORD=${RESTIC_PASSWORD}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+      - S3_BUCKET=${S3_BUCKET}
+      - DISCORD_WEBHOOK=${DISCORD_WEBHOOK}
+      - BACKUP_CRON=${BACKUP_CRON:-0 3 * * *}
+    volumes:
+      - ./scripts:/scripts:ro
+      # Docker socket for pg_dumpall via docker exec
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Local restic repository
+      - /mnt/user/Backup/restic-repo:/repo
+      # Database dumps output directory
+      - db-dumps:/data/db-dumps
+      # Data to back up
+      - /mnt/user/Media/Pictures:/data/pictures:ro
+      - /mnt/user/Documents:/data/documents:ro
+      - /mnt/user/Media/Books:/data/books:ro
+      - /mnt/user/Media/Comics:/data/comics:ro
+      - /mnt/user/appdata:/data/appdata:ro
+      # Restic cache for faster operations
+      - restic-cache:/root/.cache/restic
+    labels:
+      net.unraid.docker.icon: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/restic.png"
+
+volumes:
+  restic-cache:
+  db-dumps:
