@@ -4,6 +4,7 @@ services:
     container_name: restic-backup
     entrypoint: /scripts/backup.sh
     restart: unless-stopped
+    network_mode: host
     environment:
       - RESTIC_REPOSITORY=rest:http://${QTOWER_TAILSCALE_IP}:8000/
       - RESTIC_PASSWORD=${RESTIC_PASSWORD}

@@ -17,4 +17,4 @@ services:
       - /var/log:/var/log/host:ro
       - ./config.yaml:/etc/otelcol-contrib/config.yaml:ro
     environment:
-      - SIGNOZ_ENDPOINT=${SIGNOZ_ENDPOINT}
+      - OTEL_ENDPOINT=${OTEL_ENDPOINT}

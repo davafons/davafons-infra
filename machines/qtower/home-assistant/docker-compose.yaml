@@ -29,6 +29,8 @@ services:
           memory: 512M
     depends_on:
       - eclipse_mosquitto
+    devices:
+      - /dev/serial/by-id/usb-Nabu_Casa_Home_Assistant_Connect_ZBT-1_7e7b5a8e01d7ed119b2c776162c613ac-if00-port0:/dev/ttyUSB0
     volumes:
       - /mnt/user/appdata/zigbee2mqtt:/app/data
       - /run/udev:/run/udev:ro

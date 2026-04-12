@@ -1,0 +1,12 @@
+groups:
+  - name: container-alerts
+    interval: 1m
+    rules:
+      - alert: ContainerMemoryHigh
+        expr: |
+          avg by (host_name, container_name) (container_memory_percent) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          description: "Container {{ $labels.container_name }} on {{ $labels.host_name }} is using {{ $value | printf \"%.1f\" }}% of its memory limit"

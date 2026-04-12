@@ -1,0 +1,162 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        max_recv_msg_size_mib: 16
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+  batch:
+    send_batch_size: 10000
+    send_batch_max_size: 11000
+    timeout: 10s
+  filter/drop_noisy_logs:
+    error_mode: ignore
+    logs:
+      log_record:
+        # Drop entire hosts
+        - 'IsMatch(resource.attributes["host.name"], "(?i)watchtower")'
+        # Drop non-critical infrastructure containers
+        - 'IsMatch(resource.attributes["container.name"], "^(nadeshiko-status|otelcol|alertmanager-discord|signoz-.*|caddy|pgadmin|cloudflared)$")'
+        # Drop noisy journald sources
+        - 'IsMatch(attributes["syslog.identifier"], "^(otelcol-contrib|tailscaled|cloud-init-hotplugd|networkctl|containerd|networkd-dispatcher|CRON|\\(sd-pam\\)|\\(systemd\\))$")'
+  transform/cleanup_logs:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          # === Normalize useful backend headers before bulk deletion ===
+          # Attributes from edge otelcol are nested maps: attributes["req"]["headers"]["cf-connecting-ip"]
+          - set(attributes["http.client_ip"], attributes["req"]["headers"]["cf-connecting-ip"]) where attributes["req"]["headers"]["cf-connecting-ip"] != nil
+          - set(attributes["http.client_country"], attributes["req"]["headers"]["cf-ipcountry"]) where attributes["req"]["headers"]["cf-ipcountry"] != nil
+          - set(attributes["http.user_agent"], attributes["req"]["headers"]["user-agent"]) where attributes["req"]["headers"]["user-agent"] != nil
+          - set(attributes["http.cf_ray"], attributes["req"]["headers"]["cf-ray"]) where attributes["req"]["headers"]["cf-ray"] != nil
+
+          # === Drop log.raw — parsed fields cover everything ===
+          - delete_key(attributes, "log.raw")
+
+          # === Drop entire nested maps for res.headers, req.body, req.query ===
+          - delete_key(attributes["res"], "headers")
+          - delete_key(attributes["req"], "body")
+          - delete_key(attributes["req"], "query")
+          # Drop Caddy's nested request.headers
+          - delete_key(attributes["request"], "headers")
+
+          # === Drop noisy request headers (nested map keys) ===
+          - delete_key(attributes["req"]["headers"], "cookie")
+          - delete_key(attributes["req"]["headers"], "authorization")
+          - delete_key(attributes["req"]["headers"], "content-length")
+          - delete_key(attributes["req"]["headers"], "content-type")
+          - delete_key(attributes["req"]["headers"], "sec-ch-ua")
+          - delete_key(attributes["req"]["headers"], "sec-fetch-dest")
+          - delete_key(attributes["req"]["headers"], "sec-fetch-site")
+          - delete_key(attributes["req"]["headers"], "sec-fetch-user")
+          - delete_key(attributes["req"]["headers"], "sec-gpc")
+          - delete_key(attributes["req"]["headers"], "dnt")
+          - delete_key(attributes["req"]["headers"], "priority")
+          - delete_key(attributes["req"]["headers"], "cdn-loop")
+          - delete_key(attributes["req"]["headers"], "cf-visitor")
+          - delete_key(attributes["req"]["headers"], "upgrade-insecure-requests")
+          - delete_key(attributes["req"]["headers"], "accept-encoding")
+          - delete_key(attributes["req"]["headers"], "traceparent")
+          - delete_key(attributes["req"]["headers"], "x-kamal-target")
+          - delete_key(attributes["req"]["headers"], "x-request-start")
+          - delete_key(attributes["req"]["headers"], "x-forwarded-proto")
+
+          # === Fix severity for plain-text logs that edge collectors missed ===
+          # Tab-separated format: VictoriaMetrics, vmalert, victorialogs, victoriatraces
+          # e.g. "2026-04-13T03:13:50.966Z\tinfo\tVictoriaMetrics/..."
+          - set(severity_number, SEVERITY_NUMBER_INFO) where severity_number == 0 and IsMatch(body, "\\tinfo\\t")
+          - set(severity_text, "INFO") where severity_text == "" and IsMatch(body, "\\tinfo\\t")
+          - set(severity_number, SEVERITY_NUMBER_WARN) where severity_number == 0 and IsMatch(body, "\\twarn\\t")
+          - set(severity_text, "WARN") where severity_text == "" and IsMatch(body, "\\twarn\\t")
+          - set(severity_number, SEVERITY_NUMBER_ERROR) where severity_number == 0 and IsMatch(body, "\\terror\\t")
+          - set(severity_text, "ERROR") where severity_text == "" and IsMatch(body, "\\terror\\t")
+          - set(severity_number, SEVERITY_NUMBER_FATAL) where severity_number == 0 and IsMatch(body, "\\tfatal\\t")
+          - set(severity_text, "FATAL") where severity_text == "" and IsMatch(body, "\\tfatal\\t")
+          # Key=value format: Grafana
+          # e.g. "logger=cleanup t=... level=info msg=..."
+          - set(severity_number, SEVERITY_NUMBER_INFO) where severity_number == 0 and IsMatch(body, " level=info ")
+          - set(severity_text, "INFO") where severity_text == "" and IsMatch(body, " level=info ")
+          - set(severity_number, SEVERITY_NUMBER_WARN) where severity_number == 0 and IsMatch(body, " level=warn ")
+          - set(severity_text, "WARN") where severity_text == "" and IsMatch(body, " level=warn ")
+          - set(severity_number, SEVERITY_NUMBER_ERROR) where severity_number == 0 and IsMatch(body, " level=error ")
+          - set(severity_text, "ERROR") where severity_text == "" and IsMatch(body, " level=error ")
+          # Postgres format: "... LOG: ...", "... WARNING: ...", "... ERROR: ...", "... FATAL: ..."
+          - 'set(severity_number, SEVERITY_NUMBER_INFO) where severity_number == 0 and IsMatch(body, " LOG: ")'
+          - 'set(severity_text, "INFO") where severity_text == "" and IsMatch(body, " LOG: ")'
+          - 'set(severity_number, SEVERITY_NUMBER_WARN) where severity_number == 0 and IsMatch(body, " WARNING: ")'
+          - 'set(severity_text, "WARN") where severity_text == "" and IsMatch(body, " WARNING: ")'
+          - 'set(severity_number, SEVERITY_NUMBER_ERROR) where severity_number == 0 and IsMatch(body, " ERROR: ")'
+          - 'set(severity_text, "ERROR") where severity_text == "" and IsMatch(body, " ERROR: ")'
+          - 'set(severity_number, SEVERITY_NUMBER_FATAL) where severity_number == 0 and IsMatch(body, " FATAL: ")'
+          - 'set(severity_text, "FATAL") where severity_text == "" and IsMatch(body, " FATAL: ")'
+
+          # === Normalize kamal-proxy duration from nanoseconds to milliseconds ===
+          # Kamal-proxy emits numeric string "13194523" (ns). Nitro emits "13ms" (left as-is).
+          - set(attributes["duration_ms"], Int(attributes["duration"]) / 1000000) where attributes["duration"] != nil and not IsMatch(attributes["duration"], ".*[a-z].*")
+          - delete_key(attributes, "duration") where attributes["duration_ms"] != nil
+
+          # === General cleanup ===
+          - delete_key(attributes, "req_last_modified")
+          - delete_key(attributes, "req_cache_control")
+          - delete_key(attributes, "req_user_agent")
+
+connectors:
+  spanmetrics:
+
+exporters:
+  otlphttp/victoriametrics:
+    endpoint: http://victoriametrics:8428/opentelemetry
+    tls:
+      insecure: true
+    sending_queue:
+      batch:
+  otlphttp/victorialogs:
+    logs_endpoint: http://victorialogs:9428/insert/opentelemetry/v1/logs
+    headers:
+      VL-Msg-Field: body
+      VL-Time-Field: observedTimestamp
+      VL-Ignore-Fields: scope.name,scope.version,os.type
+      VL-Stream-Fields: service.name,host.name,deployment.environment
+    tls:
+      insecure: true
+    sending_queue:
+      batch:
+  otlphttp/victoriatraces:
+    traces_endpoint: http://victoriatraces:10428/insert/opentelemetry/v1/traces
+    tls:
+      insecure: true
+    sending_queue:
+      num_consumers: 10
+      queue_size: 1000
+      batch:
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  telemetry:
+    logs:
+      encoding: json
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/victoriatraces, spanmetrics]
+    metrics:
+      receivers: [otlp, spanmetrics]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/victoriametrics]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/drop_noisy_logs, transform/cleanup_logs, batch]
+      exporters: [otlphttp/victorialogs]

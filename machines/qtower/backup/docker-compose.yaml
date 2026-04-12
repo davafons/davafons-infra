@@ -28,7 +28,7 @@ services:
       - /mnt/user/Media/Comics:/data/comics:ro
       - /mnt/user/appdata:/data/appdata:ro
       # Watchtower restic repo (for S3 sync)
-      - /mnt/user/Backup/watchtower-restic-repo:/watchtower-repo:ro
+      - watchtower-repo:/watchtower-repo:ro
       # Restic cache for faster operations
       - restic-cache:/root/.cache/restic
     labels:
@@ -38,10 +38,11 @@ services:
     image: restic/rest-server:latest
     container_name: restic-rest-server
     restart: unless-stopped
+    init: true
     environment:
       - OPTIONS=--no-auth
     volumes:
-      - /mnt/user/Backup/watchtower-restic-repo:/data
+      - watchtower-repo:/data
     ports:
       - "8000:8000"
     labels:
@@ -50,3 +51,4 @@ services:
 volumes:
   restic-cache:
   db-dumps:
+  watchtower-repo:

@@ -1,0 +1,33 @@
+groups:
+  - name: host-alerts
+    interval: 1m
+    rules:
+      - alert: HostCpuHigh
+        expr: system_cpu_load_average_5m > 4
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          description: "5-minute load average on {{ $labels.host_name }} is {{ $value }}"
+
+      - alert: HostMemoryHigh
+        expr: |
+          (
+            sum by (host_name) (system_memory_usage{state="used"})
+            /
+            sum by (host_name) (system_memory_usage)
+          ) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          description: "Memory usage on {{ $labels.host_name }} is {{ $value | printf \"%.1f\" }}%"
+
+      - alert: HostDiskLow
+        expr: |
+          system_filesystem_usage{state="free", type!~"tmpfs|devtmpfs|squashfs"} < 5368709120
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          description: "Free disk space on {{ $labels.host_name }} ({{ $labels.mountpoint }}) is below 5GB"

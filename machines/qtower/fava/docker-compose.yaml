@@ -1,0 +1,15 @@
+services:
+  fava:
+    image: yeicor/fava:latest
+    container_name: fava
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Tokyo
+    volumes:
+      - /mnt/user/Documents/finances:/bean:ro
+    ports:
+      - 5001:5000
+    command: fava /bean/main.beancount
+    labels:
+      net.unraid.docker.icon: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/fava.png"
+      net.unraid.docker.webui: "http://[IP]:[PORT:5001]/"

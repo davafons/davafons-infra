@@ -2,10 +2,10 @@
 
 # Monitoring Setup Script
 # Installs OpenTelemetry Collector Contrib (otelcol-contrib)
-# Ships metrics, logs, and traces to self-hosted SigNoz
+# Ships metrics, logs, and traces to self-hosted Victoria stack
 #
 # Run standalone:
-#   SIGNOZ_ENDPOINT=http://signoz:4317 \
+#   OTEL_ENDPOINT=100.91.132.24:4317 \
 #   bash setup-monitoring.sh
 #
 # Or via cloud-init (secrets loaded from /run/setup-secrets)
@@ -43,7 +43,7 @@ if [[ -f "$ALLOY_ENV" ]]; then
   source "$ALLOY_ENV"
 fi
 
-[[ -n "${SIGNOZ_ENDPOINT:-}" ]] || error "SIGNOZ_ENDPOINT is required (e.g. http://signoz:4317)"
+[[ -n "${OTEL_ENDPOINT:-}" ]] || error "OTEL_ENDPOINT is required (e.g. http://monitoring:4317)"
 
 HAS_POSTGRES=false
 if [[ -n "${POSTGRES_DSN:-}" ]]; then
@@ -352,7 +352,7 @@ receivers:
         to: body
 
   # --- OTLP receiver (for instrumented apps) ---
-  # Uses non-standard ports to avoid conflicts with SigNoz's otel-collector on the monitoring server
+  # Uses non-standard ports to avoid conflicts with the central otel-collector on the monitoring server
   # Listens on 0.0.0.0 so Docker containers on bridge networks can reach it via host.docker.internal
   otlp:
     protocols:
@@ -406,7 +406,7 @@ processors:
     send_batch_max_size: 2048
     timeout: 10s
   resourcedetection:
-    detectors: [env, system, docker]
+    detectors: [env, system]
     timeout: 2s
     system:
       hostname_sources: [os]
@@ -414,7 +414,7 @@ processors:
         host.name:
           enabled: true
         os.type:
-          enabled: false
+          enabled: true
   # Normalize high-cardinality span names (collapse IDs into placeholders)
   transform/normalize_spans:
     error_mode: ignore
@@ -457,11 +457,11 @@ processors:
     error_mode: ignore
     logs:
       log_record:
-        - 'attributes["container.name"] != nil and IsMatch(attributes["container.name"], "^(signoz-|.*redis.*|adminer|pgadmin|autokuma)")'
+        - 'attributes["container.name"] != nil and IsMatch(attributes["container.name"], "^(otelcol|.*redis.*|adminer|pgadmin|autokuma)")'
 
 exporters:
   otlp:
-    endpoint: ${env:SIGNOZ_ENDPOINT}
+    endpoint: ${env:OTEL_ENDPOINT}
     tls:
       insecure: true
     compression: gzip
@@ -509,7 +509,7 @@ fi
 info "Setting up otelcol-contrib environment..."
 
 cat > /etc/otelcol-contrib/environment <<EOF
-SIGNOZ_ENDPOINT=${SIGNOZ_ENDPOINT}
+OTEL_ENDPOINT=${OTEL_ENDPOINT}
 EOF
 
 if $HAS_POSTGRES; then
@@ -592,4 +592,4 @@ WRAPPER
   success "postgresqltuner installed — run: postgresqltuner"
 fi
 
-success "Monitoring setup complete! All telemetry shipping to SigNoz."
+success "Monitoring setup complete! All telemetry shipping to VictoriaMetrics."

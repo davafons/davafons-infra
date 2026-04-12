@@ -214,7 +214,7 @@ processors:
 
 exporters:
   otlp_grpc:
-    endpoint: ${env:SIGNOZ_ENDPOINT}
+    endpoint: ${env:OTEL_ENDPOINT}
     tls:
       insecure: true
     compression: gzip

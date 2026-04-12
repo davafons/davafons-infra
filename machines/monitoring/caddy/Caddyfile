@@ -2,8 +2,20 @@
 	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
 }
 
-signoz.m.davafons.cc {
-	reverse_proxy localhost:8080
+grafana.m.davafons.cc {
+	reverse_proxy localhost:3000
+}
+
+alertmanager.m.davafons.cc {
+	reverse_proxy localhost:9093
+}
+
+vmui.m.davafons.cc {
+	reverse_proxy localhost:8428
+}
+
+logs.m.davafons.cc {
+	reverse_proxy localhost:9428
 }
 
 status.m.davafons.cc {
