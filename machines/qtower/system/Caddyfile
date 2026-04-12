@@ -1,0 +1,51 @@
+{
+	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+}
+
+ha.q.davafons.cc {
+	reverse_proxy localhost:8123
+}
+
+photos.q.davafons.cc {
+	reverse_proxy localhost:2283
+}
+
+plex.q.davafons.cc {
+	reverse_proxy localhost:32400
+}
+
+sonarr.q.davafons.cc {
+	reverse_proxy localhost:8989
+}
+
+radarr.q.davafons.cc {
+	reverse_proxy localhost:7878
+}
+
+bazarr.q.davafons.cc {
+	reverse_proxy localhost:6767
+}
+
+jackett.q.davafons.cc {
+	reverse_proxy localhost:9117
+}
+
+qbit.q.davafons.cc {
+	reverse_proxy localhost:8889
+}
+
+syncthing.q.davafons.cc {
+	reverse_proxy localhost:8384
+}
+
+calibre.q.davafons.cc {
+	reverse_proxy localhost:24080
+}
+
+komga.q.davafons.cc {
+	reverse_proxy localhost:25600
+}
+
+zigbee.q.davafons.cc {
+	reverse_proxy localhost:55403
+}

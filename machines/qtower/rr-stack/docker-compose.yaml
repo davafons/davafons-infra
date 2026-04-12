@@ -9,15 +9,14 @@ services:
     environment:
       - UID=99
       - GID=100
-      - REGION=Japan
-      - USER=${PIA_USER}
-      - PASSWORD=${PIA_PASSWORD}
+      - PIA_REGION=Japan
+      - PIA_USERNAME=${PIA_USER}
+      - PIA_PASSWORD=${PIA_PASSWORD}
       - PORT_FORWARDING=true
       - LEGACY_IPTABLES=true
       - TZ=Asia/Tokyo
     volumes:
       - /mnt/user/appdata/qbittorrent:/config
-      - /mnt/user/appdata/qbittorrent/etc:/etc
       - /mnt/user/Downloads:/downloads
     labels:
       net.unraid.docker.icon: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/qbittorrent.png"

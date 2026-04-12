@@ -1,0 +1,12 @@
+services:
+  caddy:
+    image: ghcr.io/caddybuilds/caddy-cloudflare:latest
+    container_name: caddy
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+    volumes:
+      - /home/docker/caddy/data:/data
+      - /home/docker/caddy/config:/config
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro

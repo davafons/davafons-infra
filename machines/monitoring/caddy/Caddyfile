@@ -1,0 +1,15 @@
+{
+	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+}
+
+signoz.m.davafons.cc {
+	reverse_proxy localhost:8080
+}
+
+status.m.davafons.cc {
+	reverse_proxy localhost:3011
+}
+
+pgadmin.m.davafons.cc {
+	reverse_proxy localhost:5050
+}
