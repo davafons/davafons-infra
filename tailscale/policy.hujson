@@ -46,6 +46,13 @@
 			"ip":  ["4317", "4318"],
 		},
 
+		// watchtower can push backups to qtower (restic REST server)
+		{
+			"src": ["tag:watchtower"],
+			"dst": ["tag:qtower"],
+			"ip":  ["8000"],
+		},
+
 		// CI can reach all servers for deployments (SSH only)
 		{
 			"src": ["tag:ci"],
@@ -125,7 +132,7 @@
 		},
 		{
 			"src":    "tag:watchtower",
-			"accept": ["tag:monitoring:4317", "tag:monitoring:4318"],
+			"accept": ["tag:monitoring:4317", "tag:monitoring:4318", "tag:qtower:8000"],
 			"deny":   ["tag:nadeshiko:443", "tag:inari:443", "tag:qtower:443", "tag:monitoring:8080"],
 		},
 		// Monitoring can reach specific admin ports on service servers

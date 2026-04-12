@@ -27,8 +27,23 @@ services:
       - /mnt/user/Media/Books:/data/books:ro
       - /mnt/user/Media/Comics:/data/comics:ro
       - /mnt/user/appdata:/data/appdata:ro
+      # Watchtower restic repo (for S3 sync)
+      - /mnt/user/Backup/watchtower-restic-repo:/watchtower-repo:ro
       # Restic cache for faster operations
       - restic-cache:/root/.cache/restic
+    labels:
+      net.unraid.docker.icon: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/restic.png"
+
+  rest-server:
+    image: restic/rest-server:latest
+    container_name: restic-rest-server
+    restart: unless-stopped
+    environment:
+      - OPTIONS=--no-auth
+    volumes:
+      - /mnt/user/Backup/watchtower-restic-repo:/data
+    ports:
+      - "8000:8000"
     labels:
       net.unraid.docker.icon: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/restic.png"
 

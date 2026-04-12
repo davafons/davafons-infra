@@ -56,10 +56,12 @@ restic forget \
   --keep-monthly 6 \
   --prune
 
-# --- Sync restic repo to S3 ---
-log "Syncing restic repo to S3 (s3://${S3_BUCKET})..."
+# --- Sync restic repos to S3 ---
+log "Syncing qtower restic repo to S3 (s3://${S3_BUCKET}/qtower)..."
+aws s3 sync /repo "s3://${S3_BUCKET}/qtower" --delete --storage-class DEEP_ARCHIVE
 
-aws s3 sync /repo "s3://${S3_BUCKET}" --delete --storage-class DEEP_ARCHIVE
+log "Syncing watchtower restic repo to S3 (s3://${S3_BUCKET}/watchtower)..."
+aws s3 sync /watchtower-repo "s3://${S3_BUCKET}/watchtower" --delete --storage-class DEEP_ARCHIVE
 
 log "All done."
 notify "✅ **qtower backup complete** at $(date '+%Y-%m-%d %H:%M:%S')"

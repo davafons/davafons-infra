@@ -49,3 +49,7 @@ komga.q.davafons.cc {
 zigbee.q.davafons.cc {
 	reverse_proxy localhost:55403
 }
+
+unraid.q.davafons.cc {
+	reverse_proxy localhost:8080
+}

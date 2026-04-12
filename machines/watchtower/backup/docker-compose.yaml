@@ -1,0 +1,20 @@
+services:
+  restic:
+    image: restic/restic:latest
+    container_name: restic-backup
+    entrypoint: /scripts/backup.sh
+    restart: unless-stopped
+    environment:
+      - RESTIC_REPOSITORY=rest:http://${QTOWER_TAILSCALE_IP}:8000/
+      - RESTIC_PASSWORD=${RESTIC_PASSWORD}
+      - DISCORD_WEBHOOK=${DISCORD_WEBHOOK}
+      - BACKUP_CRON=${BACKUP_CRON:-0 2 * * *}
+    volumes:
+      - ./scripts:/scripts:ro
+      # Data to back up
+      - /mnt/datos:/data/datos:ro
+      # Restic cache for faster operations
+      - restic-cache:/root/.cache/restic
+
+volumes:
+  restic-cache:
