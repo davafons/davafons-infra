@@ -3,11 +3,11 @@ services:
     image: j4ym0/pia-qbittorrent
     container_name: pia-qbittorrent
     ports:
-        - 8888:8888
+      - 8889:8888
     cap_add:
       - NET_ADMIN
     environment:
-      - UID=1000
+      - UID=99
       - GID=100
       - REGION=Japan
       - USER=${PIA_USER}
@@ -16,9 +16,13 @@ services:
       - LEGACY_IPTABLES=true
       - TZ=Asia/Tokyo
     volumes:
-      - qbittorrent:/config
-      - qbittorrent_etc:/etc
-      - /share/Download:/downloads
+      - /mnt/user/appdata/qbittorrent:/config
+      - /mnt/user/appdata/qbittorrent/etc:/etc
+      - /mnt/user/Downloads:/downloads
+    labels:
+      net.unraid.docker.icon: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/qbittorrent.png"
+      net.unraid.docker.webui: "http://[IP]:[PORT:8889]/"
+    restart: unless-stopped
 
   sonarr:
     image: lscr.io/linuxserver/sonarr:latest
@@ -29,13 +33,16 @@ services:
     ports:
       - 8989:8989
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=99
+      - PGID=100
       - TZ=Asia/Tokyo
     volumes:
-      - sonarr:/config
-      - /share/Media/Series:/tv
-      - /share/Download:/downloads
+      - /mnt/user/appdata/sonarr:/config
+      - /mnt/user/Media/Series:/tv
+      - /mnt/user/Downloads:/downloads
+    labels:
+      net.unraid.docker.icon: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/sonarr.png"
+      net.unraid.docker.webui: "http://[IP]:[PORT:8989]/"
 
   radarr:
     image: lscr.io/linuxserver/radarr:latest
@@ -46,16 +53,19 @@ services:
     ports:
       - 7878:7878
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=99
+      - PGID=100
       - TZ=Asia/Tokyo
     volumes:
-      - radarr:/config
-      - /share/Media/Movies:/movies
-      - /share/Download:/downloads
+      - /mnt/user/appdata/radarr:/config
+      - /mnt/user/Media/Movies:/movies
+      - /mnt/user/Downloads:/downloads
+    labels:
+      net.unraid.docker.icon: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/radarr.png"
+      net.unraid.docker.webui: "http://[IP]:[PORT:7878]/"
 
   bazarr:
-    image: lscr.io/linuxserver/bazarr:development
+    image: lscr.io/linuxserver/bazarr:latest
     container_name: bazarr
     restart: unless-stopped
     depends_on:
@@ -63,14 +73,17 @@ services:
     ports:
       - 6767:6767
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=99
+      - PGID=100
       - TZ=Asia/Tokyo
     volumes:
-      - bazarr:/config
-      - /share/Media/Movies:/movies
-      - /share/Media/Series:/tv
-      - /share/Download:/downloads
+      - /mnt/user/appdata/bazarr:/config
+      - /mnt/user/Media/Movies:/movies
+      - /mnt/user/Media/Series:/tv
+      - /mnt/user/Downloads:/downloads
+    labels:
+      net.unraid.docker.icon: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/bazarr.png"
+      net.unraid.docker.webui: "http://[IP]:[PORT:6767]/"
 
   jackett:
     image: lscr.io/linuxserver/jackett:latest
@@ -81,28 +94,15 @@ services:
     ports:
       - 9117:9117
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=99
+      - PGID=100
       - TZ=Asia/Tokyo
     volumes:
-      - jackett:/config
-      - /share/Download:/downloads
-
-  tautilli_anilist:
-    image: rickdb/tautulli-plexanisync:latest
-    container_name: tautilli_anilist
-    restart: unless-stopped
-    ports:
-      - 45523:8181
-    environment:
-      - ANI_TOKEN=${ANI_TOKEN}
-      - ANI_USERNAME=${ANI_USERNAME}
-      - PLEX_TOKEN=${PLEX_TOKEN}
-      - PLEX_URL=${PLEX_URL}
-      - PLEX_SECTION=${PLEX_SECTION}
-      - TZ=Asia/Tokyo
-    volumes:
-      - tautilli_anilist:/config
+      - /mnt/user/appdata/jackett:/config
+      - /mnt/user/Downloads:/downloads
+    labels:
+      net.unraid.docker.icon: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/jackett.png"
+      net.unraid.docker.webui: "http://[IP]:[PORT:9117]/"
 
   plex:
     image: lscr.io/linuxserver/plex:latest
@@ -110,27 +110,20 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=99
+      - PGID=100
       - TZ=Asia/Tokyo
       - VERSION=docker
       - PLEX_CLAIM=${PLEX_CLAIM}
     volumes:
-      - plex:/config
-      - /share/Media/Series:/tv
-      - /share/Media/Movies:/movies
-      - /share/Media/Music:/music
+      - /mnt/user/appdata/Plex-Media-Server:/config
+      - /mnt/user/Media/Series:/tv
+      - /mnt/user/Media/Movies:/movies
+      - /mnt/user/Media/Music:/music
     deploy:
       resources:
         limits:
           memory: 4G
-
-volumes:
-  qbittorrent:
-  qbittorrent_etc:
-  sonarr:
-  radarr:
-  bazarr:
-  jackett:
-  tautilli_anilist:
-  plex:
+    labels:
+      net.unraid.docker.icon: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/plex.png"
+      net.unraid.docker.webui: "http://[IP]:32400/web"

@@ -3,34 +3,37 @@ services:
     image: lscr.io/linuxserver/calibre:latest
     container_name: calibre
     security_opt:
-      - seccomp:unconfined #optional
+      - seccomp:unconfined
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=99
+      - PGID=100
       - TZ=Asia/Tokyo
     volumes:
-      - calibre:/config
-      - /share/Media/Books:/books
+      - /mnt/user/appdata/calibre:/config
+      - /mnt/user/Media/Books:/books
     ports:
       - 24080:8080
       - 24181:8181
       - 24081:8081
+    labels:
+      net.unraid.docker.icon: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/calibre.png"
+      net.unraid.docker.webui: "http://[IP]:[PORT:8080]/"
     restart: unless-stopped
+
   komga:
     image: gotson/komga:latest
     container_name: komga
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=99
+      - PGID=100
       - TZ=Asia/Tokyo
     volumes:
-      - komga:/config
-      - /share/Media/Comics/English:/manga-english
-      - /share/Media/Comics/Japanese:/manga-japanese
+      - /mnt/user/appdata/komga:/config
+      - /mnt/user/Media/Comics/English:/manga-english
+      - /mnt/user/Media/Comics/Japanese:/manga-japanese
     ports:
       - 25600:25600
+    labels:
+      net.unraid.docker.icon: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/komga.png"
+      net.unraid.docker.webui: "http://[IP]:[PORT:25600]/"
     restart: unless-stopped
-
-volumes:
-  calibre:
-  komga:

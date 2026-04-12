@@ -399,8 +399,8 @@ cat >> /etc/otelcol-contrib/config.yaml <<'OTELCOL_SERVICE'
 processors:
   memory_limiter:
     check_interval: 5s
-    limit_mib: 512
-    spike_limit_mib: 128
+    limit_mib: 768
+    spike_limit_mib: 192
   batch:
     send_batch_size: 1000
     send_batch_max_size: 2048

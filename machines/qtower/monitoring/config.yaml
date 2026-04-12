@@ -35,7 +35,7 @@ receivers:
         enabled: true
 
   # --- Docker container logs ---
-  filelog/docker:
+  file_log/docker:
     include: [/var/lib/docker/containers/*/*-json.log]
     start_at: end
     include_file_name: false
@@ -57,13 +57,16 @@ receivers:
         parse_from: attributes._docker.time
         layout_type: gotime
         layout: '2006-01-02T15:04:05.999999999Z'
-      # Extract container name from Docker log tag
+      # Extract container name from Docker log tag (if available)
       - type: move
         if: attributes._docker.attrs != nil and attributes._docker.attrs.tag != nil
         from: attributes._docker.attrs.tag
         to: resource["container.name"]
       - type: remove
         field: attributes._docker
+      # Fallback: extract container name from file path when tag is missing
+      # Path: /var/lib/docker/containers/<id>/<id>-json.log
+      # We map container ID to name via docker_stats labels
       - type: add
         field: attributes.log.source
         value: docker
@@ -108,6 +111,7 @@ receivers:
         output: severity-parser
 
       # === Shared cleanup ===
+      # Severity from structured JSON logs (level field)
       - id: severity-parser
         type: severity_parser
         if: attributes.level != nil
@@ -123,6 +127,27 @@ receivers:
       - type: remove
         if: attributes.level != nil
         field: attributes.level
+      # Severity from plain-text logs (e.g. "2026-04-12 12:04:50 INF ..." or "[ERROR] ...")
+      - type: regex_parser
+        if: 'attributes.level == nil and body != nil and body matches "(?i)(?:^|\\s|\\[)(?:DBG|TRC|INF|WRN|ERR|FTL|TRACE|DEBUG|INFO|WARN(?:ING)?|ERROR|FATAL|CRIT(?:ICAL)?)(?:\\s|\\]|:)"'
+        parse_from: body
+        regex: '(?i)(?:^|\s|\[)(?P<text_level>DBG|TRC|INF|WRN|ERR|FTL|TRACE|DEBUG|INFO|WARN(?:ING)?|ERROR|FATAL|CRIT(?:ICAL)?)(?:\s|\]|:)'
+        parse_to: attributes._text_severity
+        preserve_to: body
+      - type: severity_parser
+        if: attributes._text_severity != nil and attributes._text_severity.text_level != nil
+        parse_from: attributes._text_severity.text_level
+        overwrite_text: true
+        mapping:
+          trace: [TRC, trc, TRACE, trace]
+          debug: [DBG, dbg, DEBUG, debug]
+          info: [INF, inf, INFO, info]
+          warn: [WRN, wrn, WARN, warn, WARNING, warning]
+          error: [ERR, err, ERROR, error]
+          fatal: [FTL, ftl, FATAL, fatal, CRIT, crit, CRITICAL, critical]
+      - type: remove
+        if: attributes._text_severity != nil
+        field: attributes._text_severity
       - type: remove
         if: attributes.time != nil
         field: attributes.time
@@ -137,7 +162,7 @@ receivers:
         field: attributes.attrs
 
   # --- System logs (syslog — Unraid uses syslog, not journald) ---
-  filelog/syslog:
+  file_log/syslog:
     include: [/var/log/host/syslog, /var/log/host/messages]
     start_at: end
     operators:
@@ -171,7 +196,7 @@ processors:
     send_batch_max_size: 2048
     timeout: 10s
   resourcedetection:
-    detectors: [env, system, docker]
+    detectors: [env, system]
     timeout: 2s
     system:
       hostname_sources: [os]
@@ -188,7 +213,7 @@ processors:
         - 'attributes["container.name"] != nil and IsMatch(attributes["container.name"], "^(otelcol-contrib|.*redis.*|adminer|pgadmin)")'
 
 exporters:
-  otlp:
+  otlp_grpc:
     endpoint: ${env:SIGNOZ_ENDPOINT}
     tls:
       insecure: true
@@ -211,8 +236,8 @@ service:
     metrics:
       receivers: [hostmetrics, docker_stats]
       processors: [memory_limiter, resourcedetection, batch]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
     logs:
-      receivers: [filelog/docker, filelog/syslog]
+      receivers: [file_log/docker, file_log/syslog]
       processors: [memory_limiter, resourcedetection, filter/drop_noisy, batch]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
