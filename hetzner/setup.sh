@@ -353,6 +353,43 @@ install -m 644 "$CONFIG_DIR/audit.rules" /etc/audit/rules.d/audit.rules
 install -m 644 "$CONFIG_DIR/docker-logrotate.conf" /etc/logrotate.d/docker-logs
 install -m 644 "$CONFIG_DIR/unattended-upgrades.conf" /etc/apt/apt.conf.d/50unattended-upgrades
 
+# --- Swap Setup (idempotent) ---
+# 4GB swap with swappiness=1: only use swap at 99% RAM (prevents OOM cascade)
+log "Setting up 4GB swap..."
+if [[ ! -f /swapfile ]]; then
+  fallocate -l 4G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo "/swapfile none swap sw 0 0" >> /etc/fstab
+  log "Swap created and activated"
+else
+  log "Swap already exists, skipping creation"
+fi
+
+# Always ensure swappiness is set correctly
+if ! grep -q "^vm.swappiness=1$" /etc/sysctl.conf; then
+  cat >> /etc/sysctl.conf << 'EOF'
+# Swap as last resort - prevents Docker thrashing under memory pressure
+vm.swappiness=1
+# Less aggressive reclaim of inode/dentry caches (improves container startup)
+vm.vfs_cache_pressure=50
+EOF
+  sysctl -p
+  log "Swappiness set to 1 (swap at 99% RAM)"
+fi
+
+# Weekly memory maintenance cron (drop caches)
+cat > /etc/cron.d/memory-maintenance << 'EOF'
+# Weekly memory cleanup - drop caches every Sunday 4AM
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# Drop pagecache, dentries and inodes (reclaimable memory only)
+0 4 * * 0 root sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true
+EOF
+chmod 644 /etc/cron.d/memory-maintenance
+
 # --- Remove Postfix (not needed, Discord handles all notifications) ---
 log "Removing Postfix..."
 systemctl disable postfix 2>/dev/null || true

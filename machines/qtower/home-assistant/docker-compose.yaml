@@ -2,8 +2,12 @@ services:
   homeassistant:
     image: ghcr.io/home-assistant/home-assistant:stable
     container_name: homeassistant
+    deploy:
+      resources:
+        limits:
+          memory: 2G
     volumes:
-      - ha_config:/config
+      - /mnt/user/appdata/homeassistant:/config
       - /etc/localtime:/etc/localtime:ro
       - /run/dbus:/run/dbus:ro
     restart: unless-stopped
@@ -14,55 +18,40 @@ services:
       - TZ=Asia/Tokyo
     network_mode: host
     devices:
-      # Make sure this matched your adapter location
+      # Make sure this matches your adapter location
       - /dev/ttyUSB0:/dev/ttyUSB0
 
   zigbee2mqtt:
     container_name: zigbee2mqtt
     image: koenkk/zigbee2mqtt
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     depends_on:
       - eclipse_mosquitto
     privileged: true
     volumes:
-      - zigbee2mqtt_data:/app/data
+      - /mnt/user/appdata/zigbee2mqtt:/app/data
       - /run/udev:/run/udev:ro
     ports:
       # Frontend port
       - 55403:8080
     environment:
-      - TZ=Asia/Japan
+      - TZ=Asia/Tokyo
     devices:
-      # Make sure this matched your adapter location
+      # Make sure this matches your adapter location
       - /dev/ttyUSB0:/dev/ttyUSB0
-      
-  matter-server:
-    container_name: matter-server
-    image: ghcr.io/home-assistant-libs/python-matter-server:stable
-    restart: unless-stopped
-    security_opt:
-      - apparmor=unconfined
-    volumes:
-      - matter:/data
-      - /run/dbus:/run/dbus:ro
-    network_mode: host
 
   eclipse_mosquitto:
     container_name: eclipse_mosquitto
     image: eclipse-mosquitto:latest
     restart: unless-stopped
     volumes:
-      - mosquitto_config:/mosquitto/config
-      - mosquitto_data:/mosquitto/data
-      - mosquitto_log:/mosquitto/log
+      - /mnt/user/appdata/mosquitto/config:/mosquitto/config
+      - /mnt/user/appdata/mosquitto/data:/mosquitto/data
+      - /mnt/user/appdata/mosquitto/log:/mosquitto/log
     network_mode: host
     environment:
-      - TZ=Asia/Japan
-
-volumes:
-  ha_config:
-  matter:
-  zigbee2mqtt_data:
-  mosquitto_config:
-  mosquitto_data:
-  mosquitto_log:
+      - TZ=Asia/Tokyo

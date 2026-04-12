@@ -1,0 +1,218 @@
+receivers:
+  # --- Host metrics (replaces node_exporter) ---
+  hostmetrics:
+    collection_interval: 60s
+    root_path: /
+    scrapers:
+      cpu: {}
+      disk: {}
+      load: {}
+      filesystem: {}
+      memory: {}
+      network: {}
+      paging: {}
+      processes: {}
+
+  # --- Docker container metrics ---
+  docker_stats:
+    endpoint: unix:///var/run/docker.sock
+    collection_interval: 60s
+    api_version: "1.43"
+    metrics:
+      container.cpu.utilization:
+        enabled: true
+      container.memory.percent:
+        enabled: true
+      container.memory.usage.total:
+        enabled: true
+      container.memory.usage.limit:
+        enabled: true
+      container.network.io.usage.rx_bytes:
+        enabled: true
+      container.network.io.usage.tx_bytes:
+        enabled: true
+      container.blockio.io_service_bytes_recursive:
+        enabled: true
+
+  # --- Docker container logs ---
+  filelog/docker:
+    include: [/var/lib/docker/containers/*/*-json.log]
+    start_at: end
+    include_file_name: false
+    include_file_path: true
+    operators:
+      - id: docker-json-parser
+        type: json_parser
+        parse_from: body
+        parse_to: attributes._docker
+      - type: move
+        from: attributes._docker.log
+        to: body
+      - type: move
+        if: attributes._docker.stream != nil
+        from: attributes._docker.stream
+        to: attributes["log.iostream"]
+      - id: docker-time-parser
+        type: time_parser
+        parse_from: attributes._docker.time
+        layout_type: gotime
+        layout: '2006-01-02T15:04:05.999999999Z'
+      # Extract container name from Docker log tag
+      - type: move
+        if: attributes._docker.attrs != nil and attributes._docker.attrs.tag != nil
+        from: attributes._docker.attrs.tag
+        to: resource["container.name"]
+      - type: remove
+        field: attributes._docker
+      - type: add
+        field: attributes.log.source
+        value: docker
+      # Set service.name from container name
+      - type: copy
+        if: resource["container.name"] != nil
+        from: resource["container.name"]
+        to: resource["service.name"]
+      # All containers on qtower are infrastructure
+      - type: add
+        field: resource["deployment.environment"]
+        value: infrastructure
+      # Route logs by container type for format-specific parsing
+      - type: router
+        routes:
+          - output: json-raw-copy
+            expr: 'body matches "^\\{"'
+        default: severity-parser
+
+      # === Structured JSON logs (Pino, Winston, etc.) ===
+      - id: json-raw-copy
+        type: copy
+        from: body
+        to: attributes["log.raw"]
+        output: json-parser
+      - id: json-parser
+        type: json_parser
+        parse_from: body
+        parse_to: attributes
+        output: json-move-msg
+      - id: json-move-msg
+        type: move
+        if: attributes.msg != nil
+        from: attributes.msg
+        to: body
+        output: json-move-message
+      - id: json-move-message
+        type: move
+        if: 'attributes.message != nil and body == nil'
+        from: attributes.message
+        to: body
+        output: severity-parser
+
+      # === Shared cleanup ===
+      - id: severity-parser
+        type: severity_parser
+        if: attributes.level != nil
+        parse_from: attributes.level
+        overwrite_text: true
+        mapping:
+          trace: [trace, TRACE, "10"]
+          debug: [debug, DEBUG, Debug, "20"]
+          info: [info, INFO, Information, "30"]
+          warn: [warn, WARN, WARNING, warning, Warning, "40"]
+          error: [error, ERROR, Error, "50"]
+          fatal: [fatal, FATAL, Fatal, "60"]
+      - type: remove
+        if: attributes.level != nil
+        field: attributes.level
+      - type: remove
+        if: attributes.time != nil
+        field: attributes.time
+      - type: remove
+        if: attributes.pid != nil
+        field: attributes.pid
+      - type: remove
+        if: attributes.hostname != nil
+        field: attributes.hostname
+      - type: remove
+        if: attributes.attrs != nil
+        field: attributes.attrs
+
+  # --- System logs (syslog — Unraid uses syslog, not journald) ---
+  filelog/syslog:
+    include: [/var/log/host/syslog, /var/log/host/messages]
+    start_at: end
+    operators:
+      - type: add
+        field: attributes.log.source
+        value: syslog
+      - type: add
+        field: resource["service.name"]
+        value: unraid-system
+      - type: add
+        field: resource["deployment.environment"]
+        value: infrastructure
+      # Parse syslog format: "Apr 12 10:30:01 hostname process[pid]: message"
+      - type: regex_parser
+        if: body matches "^[A-Z][a-z]{2}\\s"
+        parse_from: body
+        regex: '^(?P<timestamp>[A-Z][a-z]{2}\s+\d{1,2}\s\d{2}:\d{2}:\d{2})\s+(?P<hostname>\S+)\s+(?P<process>[^\[:]+)(?:\[(?P<pid>\d+)\])?:\s+(?P<message>.*)'
+        parse_to: attributes
+      - type: move
+        if: attributes.message != nil
+        from: attributes.message
+        to: body
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 384
+    spike_limit_mib: 96
+  batch:
+    send_batch_size: 1000
+    send_batch_max_size: 2048
+    timeout: 10s
+  resourcedetection:
+    detectors: [env, system, docker]
+    timeout: 2s
+    system:
+      hostname_sources: [os]
+      resource_attributes:
+        host.name:
+          enabled: true
+        os.type:
+          enabled: false
+  # Drop logs from noisy low-value containers
+  filter/drop_noisy:
+    error_mode: ignore
+    logs:
+      log_record:
+        - 'attributes["container.name"] != nil and IsMatch(attributes["container.name"], "^(otelcol-contrib|.*redis.*|adminer|pgadmin)")'
+
+exporters:
+  otlp:
+    endpoint: ${env:SIGNOZ_ENDPOINT}
+    tls:
+      insecure: true
+    compression: gzip
+    sending_queue:
+      enabled: true
+      num_consumers: 10
+      queue_size: 5000
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+
+service:
+  telemetry:
+    logs:
+      encoding: json
+  pipelines:
+    metrics:
+      receivers: [hostmetrics, docker_stats]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlp]
+    logs:
+      receivers: [filelog/docker, filelog/syslog]
+      processors: [memory_limiter, resourcedetection, filter/drop_noisy, batch]
+      exporters: [otlp]

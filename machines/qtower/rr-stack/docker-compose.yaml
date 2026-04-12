@@ -104,6 +104,27 @@ services:
     volumes:
       - tautilli_anilist:/config
 
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Tokyo
+      - VERSION=docker
+      - PLEX_CLAIM=${PLEX_CLAIM}
+    volumes:
+      - plex:/config
+      - /share/Media/Series:/tv
+      - /share/Media/Movies:/movies
+      - /share/Media/Music:/music
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
 volumes:
   qbittorrent:
   qbittorrent_etc:
@@ -112,3 +133,4 @@ volumes:
   bazarr:
   jackett:
   tautilli_anilist:
+  plex:
