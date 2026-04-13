@@ -29,6 +29,17 @@ datasources:
     editable: true
     isDefault: false
 
+  - name: Alertmanager
+    uid: alertmanager
+    type: alertmanager
+    url: http://alertmanager:9093
+    access: proxy
+    editable: true
+    isDefault: false
+    jsonData:
+      implementation: prometheus
+      handleGrafanaManagedAlerts: false
+
   - name: VictoriaTraces
     uid: victoriatraces
     type: jaeger
@@ -45,3 +56,12 @@ datasources:
         filterBySpanID: true
         customQuery: true
         query: trace_id:="${__trace.traceId}" AND span_id:="${__span.spanId}"
+      tracesToMetrics:
+        datasourceUid: victoriametrics-prom
+        spanStartTimeShift: "-5m"
+        spanEndTimeShift: "5m"
+        queries:
+          - name: Request rate
+            query: sum(rate(traces_span_metrics_duration_milliseconds_count{service_name="${__span.tags.service.name}"}[$__rate_interval]))
+          - name: Error rate
+            query: sum(rate(traces_span_metrics_calls_milliseconds_total{service_name="${__span.tags.service.name}", status_code="STATUS_CODE_ERROR"}[$__rate_interval]))

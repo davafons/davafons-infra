@@ -1,0 +1,334 @@
+{
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "Service Map",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "victoriatraces" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 1 },
+      "id": 2,
+      "targets": [
+        {
+          "queryType": "dependencyGraph",
+          "refId": "A"
+        }
+      ],
+      "title": "Service Dependency Graph",
+      "type": "nodeGraph"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+      "id": 10,
+      "title": "Service Overview",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "line", "fillOpacity": 20, "stacking": { "mode": "normal" } }
+        }
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 14 },
+      "id": 11,
+      "targets": [
+        {
+          "expr": "sum by (service_name) (rate(traces_span_metrics_duration_milliseconds_count{span_kind=\"SPAN_KIND_SERVER\", service_name=~\"${service:regex}\", deployment_environment=~\"${environment:regex}\"}[$__rate_interval]))",
+          "legendFormat": "{{ service_name }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Request Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": { "drawStyle": "line", "fillOpacity": 20 }
+        }
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 14 },
+      "id": 12,
+      "targets": [
+        {
+          "expr": "sum by (service_name) (rate(traces_span_metrics_calls_milliseconds_total{span_kind=\"SPAN_KIND_SERVER\", status_code=\"STATUS_CODE_ERROR\", service_name=~\"${service:regex}\", deployment_environment=~\"${environment:regex}\"}[$__rate_interval])) / sum by (service_name) (rate(traces_span_metrics_calls_milliseconds_total{span_kind=\"SPAN_KIND_SERVER\", service_name=~\"${service:regex}\", deployment_environment=~\"${environment:regex}\"}[$__rate_interval]))",
+          "legendFormat": "{{ service_name }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Error Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        }
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 14 },
+      "id": 13,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, service_name) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind=\"SPAN_KIND_SERVER\", service_name=~\"${service:regex}\", deployment_environment=~\"${environment:regex}\"}[$__rate_interval])))",
+          "legendFormat": "{{ service_name }} p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, service_name) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind=\"SPAN_KIND_SERVER\", service_name=~\"${service:regex}\", deployment_environment=~\"${environment:regex}\"}[$__rate_interval])))",
+          "legendFormat": "{{ service_name }} p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, service_name) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind=\"SPAN_KIND_SERVER\", service_name=~\"${service:regex}\", deployment_environment=~\"${environment:regex}\"}[$__rate_interval])))",
+          "legendFormat": "{{ service_name }} p99",
+          "refId": "C"
+        }
+      ],
+      "title": "Latency Percentiles",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
+      "id": 20,
+      "title": "Operations",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 20 } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+      "id": 21,
+      "targets": [
+        {
+          "expr": "topk(10, sum by (span_name) (rate(traces_span_metrics_duration_milliseconds_count{span_kind=\"SPAN_KIND_SERVER\", service_name=~\"${service:regex}\", deployment_environment=~\"${environment:regex}\"}[$__rate_interval])))",
+          "legendFormat": "{{ span_name }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Operations by Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "custom": { "drawStyle": "line", "fillOpacity": 10 } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "id": 22,
+      "targets": [
+        {
+          "expr": "topk(10, histogram_quantile(0.95, sum by (le, span_name) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind=\"SPAN_KIND_SERVER\", service_name=~\"${service:regex}\", deployment_environment=~\"${environment:regex}\"}[$__rate_interval]))))",
+          "legendFormat": "{{ span_name }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Slowest Operations P95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 30 } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 30 },
+      "id": 23,
+      "targets": [
+        {
+          "expr": "sum by (span_name) (rate(traces_span_metrics_calls_milliseconds_total{span_kind=\"SPAN_KIND_SERVER\", status_code=\"STATUS_CODE_ERROR\", service_name=~\"${service:regex}\", deployment_environment=~\"${environment:regex}\"}[$__rate_interval])) > 0",
+          "legendFormat": "{{ span_name }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Error Operations",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 30 },
+      "id": 24,
+      "options": {
+        "footer": { "enablePagination": true },
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Rate", "desc": true }]
+      },
+      "targets": [
+        {
+          "expr": "sum by (span_name) (rate(traces_span_metrics_duration_milliseconds_count{span_kind=\"SPAN_KIND_SERVER\", service_name=~\"${service:regex}\", deployment_environment=~\"${environment:regex}\"}[$__rate_interval])) > 0",
+          "legendFormat": "",
+          "refId": "rate",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "expr": "sum by (span_name) (rate(traces_span_metrics_calls_milliseconds_total{span_kind=\"SPAN_KIND_SERVER\", status_code=\"STATUS_CODE_ERROR\", service_name=~\"${service:regex}\", deployment_environment=~\"${environment:regex}\"}[$__rate_interval]))",
+          "legendFormat": "",
+          "refId": "errors",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, span_name) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind=\"SPAN_KIND_SERVER\", service_name=~\"${service:regex}\", deployment_environment=~\"${environment:regex}\"}[$__rate_interval])))",
+          "legendFormat": "",
+          "refId": "p95",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "title": "Operations Table",
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "span_name": "Operation",
+              "Value #rate": "Rate",
+              "Value #errors": "Errors/s",
+              "Value #p95": "P95 (ms)"
+            },
+            "excludeByName": { "Time": true }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 },
+      "id": 30,
+      "title": "Downstream Dependencies",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 20, "stacking": { "mode": "normal" } } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 39 },
+      "id": 31,
+      "targets": [
+        {
+          "expr": "topk(10, sum by (span_name) (rate(traces_span_metrics_duration_milliseconds_count{span_kind=\"SPAN_KIND_CLIENT\", service_name=~\"${service:regex}\", deployment_environment=~\"${environment:regex}\"}[$__rate_interval])))",
+          "legendFormat": "{{ span_name }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Outbound Call Rate (CLIENT spans)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "custom": { "drawStyle": "line", "fillOpacity": 10 } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 39 },
+      "id": 32,
+      "targets": [
+        {
+          "expr": "topk(10, histogram_quantile(0.95, sum by (le, span_name) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind=\"SPAN_KIND_CLIENT\", service_name=~\"${service:regex}\", deployment_environment=~\"${environment:regex}\"}[$__rate_interval]))))",
+          "legendFormat": "{{ span_name }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Outbound Call P95 Latency",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 47 },
+      "id": 40,
+      "title": "Trace Search",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "victoriatraces" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 48 },
+      "id": 41,
+      "targets": [
+        {
+          "queryType": "search",
+          "service": "${service_jaeger}",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent Traces",
+      "type": "traces"
+    }
+  ],
+  "refresh": "1m",
+  "tags": ["applications", "traces"],
+  "templating": {
+    "list": [
+      {
+        "current": { "text": "VictoriaMetrics (Prometheus)", "value": "victoriametrics-prom" },
+        "hide": 2,
+        "name": "datasource",
+        "query": "prometheus",
+        "type": "datasource"
+      },
+      {
+        "current": { "text": "All", "value": "$__all" },
+        "datasource": { "uid": "${datasource}" },
+        "definition": "label_values(traces_span_metrics_duration_milliseconds_count, deployment_environment)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Environment",
+        "multi": true,
+        "name": "environment",
+        "query": "label_values(traces_span_metrics_duration_milliseconds_count, deployment_environment)",
+        "refresh": 2,
+        "type": "query"
+      },
+      {
+        "current": { "text": "All", "value": "$__all" },
+        "datasource": { "uid": "${datasource}" },
+        "definition": "label_values(traces_span_metrics_duration_milliseconds_count{deployment_environment=~\"${environment:regex}\"}, service_name)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Service",
+        "multi": true,
+        "name": "service",
+        "query": "label_values(traces_span_metrics_duration_milliseconds_count{deployment_environment=~\"${environment:regex}\"}, service_name)",
+        "refresh": 2,
+        "type": "query"
+      },
+      {
+        "current": { "text": "", "value": "" },
+        "datasource": { "uid": "victoriatraces" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Service (Traces)",
+        "multi": false,
+        "name": "service_jaeger",
+        "query": "victoriatraces",
+        "queryValue": "",
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "Traces Explorer",
+  "uid": "traces-explorer"
+}

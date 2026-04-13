@@ -1,0 +1,778 @@
+{
+  "uid": "elasticsearch",
+  "title": "Elasticsearch",
+  "tags": ["infrastructure", "elasticsearch"],
+  "timezone": "browser",
+  "refresh": "1m",
+  "editable": false,
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "VictoriaMetrics (Prometheus)", "value": "victoriametrics-prom" },
+        "hide": 2
+      },
+      {
+        "name": "host",
+        "type": "query",
+        "datasource": { "uid": "${datasource}" },
+        "query": "label_values(elasticsearch_cluster_health, host_name)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" },
+        "sort": 1
+      },
+      {
+        "name": "index",
+        "type": "query",
+        "datasource": { "uid": "${datasource}" },
+        "query": "label_values(elasticsearch_index_documents{host_name=~\"${host:regex}\", elasticsearch_index_name!=\"_all\"}, elasticsearch_index_name)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" },
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Cluster Health",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Cluster Status",
+      "description": "Green = all shards assigned, Yellow = replicas unassigned, Red = primary shards missing",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "GREEN", "color": "green" }, "2": { "text": "YELLOW", "color": "yellow" }, "3": { "text": "RED", "color": "red" } } }
+          ],
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2 },
+              { "color": "red", "value": 3 }
+            ]
+          }
+        }
+      },
+      "options": { "graphMode": "none", "colorMode": "background", "textMode": "value" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(elasticsearch_cluster_health{host_name=~\"${host:regex}\", status=\"red\"} == 1) * 3 or (elasticsearch_cluster_health{host_name=~\"${host:regex}\", status=\"yellow\"} == 1) * 2 or (elasticsearch_cluster_health{host_name=~\"${host:regex}\", status=\"green\"} == 1) * 1",
+          "legendFormat": "Status",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Data Nodes",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 3, "x": 6, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": { "graphMode": "none", "colorMode": "background" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_cluster_data_nodes{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Total Nodes",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 3, "x": 9, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": { "graphMode": "none", "colorMode": "background" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_cluster_nodes{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Active Shards",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 3, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          }
+        }
+      },
+      "options": { "graphMode": "area", "colorMode": "background" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_cluster_shards{host_name=~\"${host:regex}\", state=\"active\"}",
+          "legendFormat": "{{ host_name }}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Unassigned Shards",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 3, "x": 15, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "options": { "graphMode": "area", "colorMode": "background" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_cluster_shards{host_name=~\"${host:regex}\", state=\"unassigned\"}",
+          "legendFormat": "{{ host_name }}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Pending Tasks",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 3, "x": 18, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      },
+      "options": { "graphMode": "area", "colorMode": "background" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_cluster_pending_tasks{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Total Documents",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 3, "x": 21, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        }
+      },
+      "options": { "graphMode": "area", "colorMode": "background" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (host_name) (elasticsearch_node_documents{host_name=~\"${host:regex}\", state=\"active\"})",
+          "legendFormat": "{{ host_name }}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "JVM Memory",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "JVM Heap Usage",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.75 },
+              { "color": "red", "value": 0.9 }
+            ]
+          }
+        }
+      },
+      "options": { "graphMode": "area", "colorMode": "background" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "jvm_memory_heap_used_bytes{host_name=~\"${host:regex}\"} / jvm_memory_heap_max_bytes{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "JVM Heap Memory",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 6, "y": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "custom": { "fillOpacity": 20, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "jvm_memory_heap_used_bytes{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }} used"
+        },
+        {
+          "refId": "B",
+          "expr": "jvm_memory_heap_committed_bytes{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }} committed"
+        },
+        {
+          "refId": "C",
+          "expr": "jvm_memory_heap_max_bytes{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }} max"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "GC Collections",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "fillOpacity": 10, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(jvm_gc_collections_count_total{host_name=~\"${host:regex}\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} {{ name }}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "GC Duration",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "fillOpacity": 10, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(jvm_gc_collections_elapsed_milliseconds_total{host_name=~\"${host:regex}\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} {{ name }}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Non-Heap Memory",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "custom": { "fillOpacity": 20, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "jvm_memory_nonheap_used_bytes{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }} used"
+        },
+        {
+          "refId": "B",
+          "expr": "jvm_memory_nonheap_committed_bytes{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }} committed"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Disk & Storage",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Disk Free %",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 23 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.15 },
+              { "color": "green", "value": 0.3 }
+            ]
+          }
+        }
+      },
+      "options": { "graphMode": "area", "colorMode": "background" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_node_fs_disk_available_bytes{host_name=~\"${host:regex}\"} / elasticsearch_node_fs_disk_total_bytes{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Disk Usage",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 23 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "custom": { "fillOpacity": 20, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_node_fs_disk_total_bytes{host_name=~\"${host:regex}\"} - elasticsearch_node_fs_disk_available_bytes{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }} used"
+        },
+        {
+          "refId": "B",
+          "expr": "elasticsearch_node_fs_disk_available_bytes{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }} available"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Shard Storage",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "custom": { "fillOpacity": 20, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_node_shards_size_bytes{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }} shard size"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Translog Size",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "custom": { "fillOpacity": 20, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_node_translog_size_bytes{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }} total"
+        },
+        {
+          "refId": "B",
+          "expr": "elasticsearch_node_translog_uncommitted_size_bytes{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }} uncommitted"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Operations",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Indexing Rate",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "fillOpacity": 20, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(elasticsearch_node_operations_completed_total{host_name=~\"${host:regex}\", operation=\"index\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} index"
+        },
+        {
+          "refId": "B",
+          "expr": "rate(elasticsearch_node_operations_completed_total{host_name=~\"${host:regex}\", operation=\"delete\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} delete"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Search Rate",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "fillOpacity": 20, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(elasticsearch_node_operations_completed_total{host_name=~\"${host:regex}\", operation=\"query\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} query"
+        },
+        {
+          "refId": "B",
+          "expr": "rate(elasticsearch_node_operations_completed_total{host_name=~\"${host:regex}\", operation=\"fetch\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} fetch"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Operation Latency",
+      "description": "Average time per operation",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "fillOpacity": 10, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(elasticsearch_node_operations_time_milliseconds_total{host_name=~\"${host:regex}\"}[$__rate_interval]) / rate(elasticsearch_node_operations_completed_total{host_name=~\"${host:regex}\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} {{ operation }}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Active Merges",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": { "fillOpacity": 20, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_index_operations_merge_current{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Network & Connections",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 56 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Connections",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 57 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": { "fillOpacity": 20, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_node_http_connections{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Circuit Breaker Tripped",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 57 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "fillOpacity": 10, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(elasticsearch_breaker_tripped_total{host_name=~\"${host:regex}\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} {{ name }}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Thread Pool Queued Tasks",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 65 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": { "fillOpacity": 10, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_node_thread_pool_tasks_queued{host_name=~\"${host:regex}\"} > 0",
+          "legendFormat": "{{ host_name }} {{ thread_pool_name }}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Open File Descriptors",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 65 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": { "fillOpacity": 20, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_node_open_files{host_name=~\"${host:regex}\"}",
+          "legendFormat": "{{ host_name }}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Index Details",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 73 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Documents per Index",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 74 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "steps": [{ "color": "blue", "value": null }] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_index_documents{host_name=~\"${host:regex}\", elasticsearch_index_name=~\"${index:regex}\", elasticsearch_index_name!=\"_all\", aggregation=\"primary_shards\", state=\"active\"}",
+          "legendFormat": "{{ elasticsearch_index_name }}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Shard Size per Index",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 74 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": { "steps": [{ "color": "blue", "value": null }] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_index_shards_size_bytes{host_name=~\"${host:regex}\", elasticsearch_index_name=~\"${index:regex}\", elasticsearch_index_name!=\"_all\", aggregation=\"total\"}",
+          "legendFormat": "{{ elasticsearch_index_name }}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Document Count per Index",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 78 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "fillOpacity": 10, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_index_documents{host_name=~\"${host:regex}\", elasticsearch_index_name=~\"${index:regex}\", elasticsearch_index_name!=\"_all\", aggregation=\"primary_shards\", state=\"active\"}",
+          "legendFormat": "{{ elasticsearch_index_name }}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Query Rate per Index",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 86 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "fillOpacity": 20, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(elasticsearch_index_operations_completed_total{host_name=~\"${host:regex}\", elasticsearch_index_name=~\"${index:regex}\", elasticsearch_index_name!=\"_all\", aggregation=\"primary_shards\", operation=\"query\"}[$__rate_interval])",
+          "legendFormat": "{{ elasticsearch_index_name }}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Indexing Rate per Index",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 86 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "fillOpacity": 20, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(elasticsearch_index_operations_completed_total{host_name=~\"${host:regex}\", elasticsearch_index_name=~\"${index:regex}\", elasticsearch_index_name!=\"_all\", aggregation=\"primary_shards\", operation=\"index\"}[$__rate_interval])",
+          "legendFormat": "{{ elasticsearch_index_name }}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Fetch Rate per Index",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 94 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "fillOpacity": 20, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(elasticsearch_index_operations_completed_total{host_name=~\"${host:regex}\", elasticsearch_index_name=~\"${index:regex}\", elasticsearch_index_name!=\"_all\", aggregation=\"primary_shards\", operation=\"fetch\"}[$__rate_interval])",
+          "legendFormat": "{{ elasticsearch_index_name }}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Segment Count per Index",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 94 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "fillOpacity": 10, "lineWidth": 1 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elasticsearch_index_segments_count{host_name=~\"${host:regex}\", elasticsearch_index_name=~\"${index:regex}\", elasticsearch_index_name!=\"_all\", aggregation=\"primary_shards\"}",
+          "legendFormat": "{{ elasticsearch_index_name }}"
+        }
+      ]
+    }
+  ]
+}

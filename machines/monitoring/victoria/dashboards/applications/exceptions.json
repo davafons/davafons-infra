@@ -1,0 +1,531 @@
+{
+  "uid": "exceptions",
+  "title": "Exceptions",
+  "tags": ["applications", "errors", "exceptions"],
+  "timezone": "browser",
+  "refresh": "1m",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {
+          "text": "VictoriaMetrics (Prometheus)",
+          "value": "victoriametrics-prom"
+        },
+        "hide": 2
+      },
+      {
+        "name": "environment",
+        "type": "query",
+        "datasource": { "uid": "${datasource}" },
+        "query": "label_values(app_exception_bytes_total, deployment_environment)",
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "current": { "text": "production", "value": "production" },
+        "sort": 1
+      },
+      {
+        "name": "service",
+        "type": "query",
+        "datasource": { "uid": "${datasource}" },
+        "query": "label_values(app_exception_bytes_total{deployment_environment=\"$environment\"}, service_name)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "allValue": ".*",
+        "current": { "text": "All", "value": ".*" },
+        "sort": 1
+      },
+      {
+        "name": "severity",
+        "type": "custom",
+        "query": "5xx,4xx,exception",
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": ["$__all"] },
+        "label": "Error Severity"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Overview",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Total Errors",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 50 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}[$__range]))",
+          "legendFormat": "errors",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Error Rate",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: err/s",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}[5m]))",
+          "legendFormat": "rate",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Unique Error Types",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "expr": "count(count by (error_type) (app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}))",
+          "legendFormat": "types",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Most Frequent Error",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "text", "value": null }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "name",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "expr": "topk(1, sum by (error_type) (increase(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}[$__range])))",
+          "legendFormat": "{{error_type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "row",
+      "title": "Error Trends",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "collapsed": false
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Error Rate by Type",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (error_type) (rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}[5m])))",
+          "legendFormat": "{{error_type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "row",
+      "title": "Error Breakdown",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "collapsed": false
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Errors by Type",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Value" },
+            "properties": [
+              { "id": "unit", "value": "short" },
+              { "id": "decimals", "value": 0 },
+              { "id": "displayName", "value": "Count" }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          { "displayName": "Count", "desc": true }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(sum by (error_type, error_severity) (increase(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}[$__range])))",
+          "legendFormat": "{{error_type}}",
+          "instant": true,
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "piechart",
+      "title": "Errors by Service",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "pieType": "donut",
+        "legend": { "displayMode": "list", "placement": "right" },
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "expr": "sum by (service_name) (increase(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}[$__range]))",
+          "legendFormat": "{{service_name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "Backend Errors",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 12,
+          "type": "timeseries",
+          "title": "Backend Error Trends",
+          "datasource": { "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "fillOpacity": 10,
+                "lineWidth": 2,
+                "spanNulls": true
+              },
+              "color": { "mode": "palette-classic" }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "targets": [
+            {
+              "expr": "sum by (error_type) (rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"nadeshiko-backend.*\", error_severity=~\"$severity\"}[5m]))",
+              "legendFormat": "{{error_type}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "type": "logs",
+          "title": "Recent Backend Errors",
+          "datasource": {
+            "type": "victoriametrics-logs-datasource",
+            "uid": "victorialogs"
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+          "options": {
+            "enableLogDetails": true,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "victoriametrics-logs-datasource",
+                "uid": "victorialogs"
+              },
+              "expr": "service.name:~\"nadeshiko-backend.*\" AND deployment.environment:$environment AND (severity:ERROR OR severity:WARN)",
+              "maxLines": 100,
+              "queryType": "instant",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "row",
+      "title": "Browser Errors",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 15,
+          "type": "timeseries",
+          "title": "Browser Error Trends",
+          "datasource": { "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "fillOpacity": 10,
+                "lineWidth": 2,
+                "spanNulls": true
+              },
+              "color": { "mode": "palette-classic" }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "targets": [
+            {
+              "expr": "sum by (error_type) (rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"nadeshiko-frontend-browser.*\", error_severity=~\"$severity\"}[5m]))",
+              "legendFormat": "{{error_type}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 16,
+          "type": "logs",
+          "title": "Recent Browser Errors",
+          "datasource": {
+            "type": "victoriametrics-logs-datasource",
+            "uid": "victorialogs"
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
+          "options": {
+            "enableLogDetails": true,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "victoriametrics-logs-datasource",
+                "uid": "victorialogs"
+              },
+              "expr": "service.name:~\"nadeshiko-frontend-browser.*\" AND deployment.environment:$environment AND severity:ERROR",
+              "maxLines": 100,
+              "queryType": "instant",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "type": "row",
+      "title": "SSR Errors",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 18,
+          "type": "timeseries",
+          "title": "SSR Error Trends",
+          "datasource": { "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "fillOpacity": 10,
+                "lineWidth": 2,
+                "spanNulls": true
+              },
+              "color": { "mode": "palette-classic" }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "targets": [
+            {
+              "expr": "sum by (error_type) (rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"nadeshiko-frontend.*-web.*\", error_severity=~\"$severity\"}[5m]))",
+              "legendFormat": "{{error_type}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 19,
+          "type": "logs",
+          "title": "Recent SSR Errors",
+          "datasource": {
+            "type": "victoriametrics-logs-datasource",
+            "uid": "victorialogs"
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+          "options": {
+            "enableLogDetails": true,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "victoriametrics-logs-datasource",
+                "uid": "victorialogs"
+              },
+              "expr": "service.name:~\"nadeshiko-frontend.*-web.*\" AND deployment.environment:$environment AND severity:ERROR",
+              "maxLines": 100,
+              "queryType": "instant",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "All Error Logs",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 50 },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 21,
+          "type": "logs",
+          "title": "Error Log Details",
+          "datasource": {
+            "type": "victoriametrics-logs-datasource",
+            "uid": "victorialogs"
+          },
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 51 },
+          "options": {
+            "enableLogDetails": true,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true,
+            "showLabels": true
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "victoriametrics-logs-datasource",
+                "uid": "victorialogs"
+              },
+              "expr": "deployment.environment:$environment AND service.name:~\"$service\" AND (severity:ERROR OR severity:WARN)",
+              "maxLines": 500,
+              "queryType": "instant",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39
+}

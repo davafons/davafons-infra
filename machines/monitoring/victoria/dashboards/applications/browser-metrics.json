@@ -1,0 +1,1047 @@
+{
+  "uid": "browser-metrics",
+  "title": "Browser Metrics",
+  "tags": [
+    "applications",
+    "browser",
+    "web-vitals"
+  ],
+  "timezone": "browser",
+  "refresh": "1m",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {
+          "text": "VictoriaMetrics (Prometheus)",
+          "value": "victoriametrics-prom"
+        },
+        "hide": 2
+      },
+      {
+        "name": "environment",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(web_vital_lcp_milliseconds_count, deployment_environment)",
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "text": "production",
+          "value": "production"
+        },
+        "sort": 1
+      },
+      {
+        "name": "page",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(web_vital_lcp_milliseconds_count{deployment_environment=\"${environment}\"}, page_path)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "sort": 1
+      },
+      {
+        "name": "country",
+        "type": "query",
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "query": "label_values(web_vital_lcp_milliseconds_count{deployment_environment=\"${environment}\"}, client_geo_country)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Core Web Vitals Overview",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "LCP (p75)",
+      "description": "Largest Contentful Paint. Good: <2500ms, Needs Improvement: <4000ms, Poor: >4000ms",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2500 },
+              { "color": "red", "value": 4000 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_lcp_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p75",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "INP (p75)",
+      "description": "Interaction to Next Paint. Good: <200ms, Needs Improvement: <500ms, Poor: >500ms",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 200 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_inp_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p75",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "CLS (p75)",
+      "description": "Cumulative Layout Shift. Good: <100, Needs Improvement: <250, Poor: >250 (values x1000)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 250 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_cls_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p75",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "TTFB (p75)",
+      "description": "Time to First Byte. Good: <800ms, Needs Improvement: <1800ms, Poor: >1800ms",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 800 },
+              { "color": "red", "value": 1800 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_ttfb_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p75",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Vital Rating Distribution",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "collapsed": false
+    },
+    {
+      "type": "piechart",
+      "title": "LCP Rating",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 6, "x": 0, "y": 6 },
+      "fieldConfig": {
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "good" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "needs-improvement" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "poor" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "options": {
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "legend": { "displayMode": "list", "placement": "bottom", "values": ["percent"] }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(web_vital_lcp_milliseconds_count{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__range])) by (vital_rating)",
+          "legendFormat": "{{vital_rating}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "piechart",
+      "title": "INP Rating",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 6, "x": 6, "y": 6 },
+      "fieldConfig": {
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "good" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "needs-improvement" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "poor" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "options": {
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "legend": { "displayMode": "list", "placement": "bottom", "values": ["percent"] }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(web_vital_inp_milliseconds_count{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__range])) by (vital_rating)",
+          "legendFormat": "{{vital_rating}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "piechart",
+      "title": "CLS Rating",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 6, "x": 12, "y": 6 },
+      "fieldConfig": {
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "good" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "needs-improvement" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "poor" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "options": {
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "legend": { "displayMode": "list", "placement": "bottom", "values": ["percent"] }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(web_vital_cls_milliseconds_count{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__range])) by (vital_rating)",
+          "legendFormat": "{{vital_rating}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "piechart",
+      "title": "TTFB Rating",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 6, "x": 18, "y": 6 },
+      "fieldConfig": {
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "good" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "needs-improvement" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "poor" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "options": {
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "legend": { "displayMode": "list", "placement": "bottom", "values": ["percent"] }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(web_vital_ttfb_milliseconds_count{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__range])) by (vital_rating)",
+          "legendFormat": "{{vital_rating}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Web Vitals Over Time",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "LCP Over Time",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2500 },
+              { "color": "red", "value": 4000 }
+            ]
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(web_vital_lcp_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_lcp_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p75",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(web_vital_lcp_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p95",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "TTFB Over Time",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 800 },
+              { "color": "red", "value": 1800 }
+            ]
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(web_vital_ttfb_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_ttfb_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p75",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(web_vital_ttfb_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p95",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "INP Over Time",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 200 },
+              { "color": "red", "value": 500 }
+            ]
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(web_vital_inp_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_inp_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p75",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(web_vital_inp_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p95",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "CLS Over Time",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 250 }
+            ]
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(web_vital_cls_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_cls_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p75",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(web_vital_cls_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p95",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Geographic Performance",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+      "collapsed": false
+    },
+    {
+      "type": "table",
+      "title": "Performance by Country",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 31 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "center",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Country" },
+            "properties": [
+              { "id": "custom.width", "value": 100 },
+              { "id": "custom.align", "value": "left" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "LCP p75 (ms)" },
+            "properties": [
+              { "id": "unit", "value": "ms" },
+              { "id": "decimals", "value": 0 },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 2500 }, { "color": "red", "value": 4000 }] } },
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "TTFB p75 (ms)" },
+            "properties": [
+              { "id": "unit", "value": "ms" },
+              { "id": "decimals", "value": 0 },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 800 }, { "color": "red", "value": 1800 }] } },
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "INP p75 (ms)" },
+            "properties": [
+              { "id": "unit", "value": "ms" },
+              { "id": "decimals", "value": 0 },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 200 }, { "color": "red", "value": 500 }] } },
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Samples" },
+            "properties": [
+              { "id": "decimals", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Samples", "desc": true }],
+        "footer": { "show": false }
+      },
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "renameByName": {
+              "client_geo_country": "Country",
+              "Value #A": "LCP p75 (ms)",
+              "Value #B": "TTFB p75 (ms)",
+              "Value #C": "INP p75 (ms)",
+              "Value #D": "Samples"
+            }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_lcp_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\"}[$__range])) by (le, client_geo_country))",
+          "legendFormat": "{{client_geo_country}}",
+          "refId": "A",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_ttfb_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\"}[$__range])) by (le, client_geo_country))",
+          "legendFormat": "{{client_geo_country}}",
+          "refId": "B",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_inp_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\"}[$__range])) by (le, client_geo_country))",
+          "legendFormat": "{{client_geo_country}}",
+          "refId": "C",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "expr": "sum(increase(web_vital_lcp_milliseconds_count{deployment_environment=\"${environment}\", page_path=~\"${page}\"}[$__range])) by (client_geo_country)",
+          "legendFormat": "{{client_geo_country}}",
+          "refId": "D",
+          "instant": true,
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "TTFB by Country (p75)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 41 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "lastNotNull"], "sortBy": "Mean", "sortDesc": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_ttfb_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\"}[$__rate_interval])) by (le, client_geo_country))",
+          "legendFormat": "{{client_geo_country}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Performance by Edge / Connection",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 49 },
+      "collapsed": false
+    },
+    {
+      "type": "bargauge",
+      "title": "TTFB by Cloudflare Edge (p75)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 50 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 800 },
+              { "color": "red", "value": 1800 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showUnfilled": true,
+        "minVizWidth": 8,
+        "minVizHeight": 16
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(histogram_quantile(0.75, sum(rate(web_vital_ttfb_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\"}[$__range])) by (le, client_geo_edge)))",
+          "legendFormat": "{{client_geo_edge}}",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "LCP by Connection Type (p75)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 50 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2500 },
+              { "color": "red", "value": 4000 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showUnfilled": true
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(histogram_quantile(0.75, sum(rate(web_vital_lcp_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\", client_connection_effective_type!=\"\"}[$__range])) by (le, client_connection_effective_type)))",
+          "legendFormat": "{{client_connection_effective_type}}",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "TTFB by Connection Type (p75)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 55 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 800 },
+              { "color": "red", "value": 1800 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showUnfilled": true
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(histogram_quantile(0.75, sum(rate(web_vital_ttfb_milliseconds_bucket{deployment_environment=\"${environment}\", page_path=~\"${page}\", client_geo_country=~\"${country}\", client_connection_effective_type!=\"\"}[$__range])) by (le, client_connection_effective_type)))",
+          "legendFormat": "{{client_connection_effective_type}}",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Performance by Page",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 60 },
+      "collapsed": false
+    },
+    {
+      "type": "table",
+      "title": "Web Vitals by Page",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 61 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "center",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Page" },
+            "properties": [
+              { "id": "custom.width", "value": 200 },
+              { "id": "custom.align", "value": "left" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "LCP p75 (ms)" },
+            "properties": [
+              { "id": "unit", "value": "ms" },
+              { "id": "decimals", "value": 0 },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 2500 }, { "color": "red", "value": 4000 }] } },
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "TTFB p75 (ms)" },
+            "properties": [
+              { "id": "unit", "value": "ms" },
+              { "id": "decimals", "value": 0 },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 800 }, { "color": "red", "value": 1800 }] } },
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "INP p75 (ms)" },
+            "properties": [
+              { "id": "unit", "value": "ms" },
+              { "id": "decimals", "value": 0 },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 200 }, { "color": "red", "value": 500 }] } },
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "CLS p75" },
+            "properties": [
+              { "id": "decimals", "value": 0 },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 100 }, { "color": "red", "value": 250 }] } },
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Samples" },
+            "properties": [
+              { "id": "decimals", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Samples", "desc": true }],
+        "footer": { "show": false }
+      },
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "renameByName": {
+              "page_path": "Page",
+              "Value #A": "LCP p75 (ms)",
+              "Value #B": "TTFB p75 (ms)",
+              "Value #C": "INP p75 (ms)",
+              "Value #D": "CLS p75",
+              "Value #E": "Samples"
+            }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_lcp_milliseconds_bucket{deployment_environment=\"${environment}\", client_geo_country=~\"${country}\"}[$__range])) by (le, page_path))",
+          "refId": "A",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_ttfb_milliseconds_bucket{deployment_environment=\"${environment}\", client_geo_country=~\"${country}\"}[$__range])) by (le, page_path))",
+          "refId": "B",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_inp_milliseconds_bucket{deployment_environment=\"${environment}\", client_geo_country=~\"${country}\"}[$__range])) by (le, page_path))",
+          "refId": "C",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_cls_milliseconds_bucket{deployment_environment=\"${environment}\", client_geo_country=~\"${country}\"}[$__range])) by (le, page_path))",
+          "refId": "D",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "expr": "sum(increase(web_vital_lcp_milliseconds_count{deployment_environment=\"${environment}\", client_geo_country=~\"${country}\"}[$__range])) by (page_path)",
+          "refId": "E",
+          "instant": true,
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "LCP by Page (p75)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 69 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_lcp_milliseconds_bucket{deployment_environment=\"${environment}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le, page_path))",
+          "legendFormat": "{{page_path}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "TTFB by Page (p75)",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 69 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(web_vital_ttfb_milliseconds_bucket{deployment_environment=\"${environment}\", client_geo_country=~\"${country}\"}[$__rate_interval])) by (le, page_path))",
+          "legendFormat": "{{page_path}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Browser Traces",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 77 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Document Load Time (p75)",
+      "description": "Time for full document load by page",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 78 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(traces_span_metrics_duration_milliseconds_bucket{deployment_environment=\"${environment}\", service_name=~\"nadeshiko-frontend-browser-.*\", span_name=~\"documentLoad .*\"}[$__rate_interval])) by (le, span_name))",
+          "legendFormat": "{{span_name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Document Fetch Time (p75)",
+      "description": "Time for document fetch (navigation) by page",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 78 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(traces_span_metrics_duration_milliseconds_bucket{deployment_environment=\"${environment}\", service_name=~\"nadeshiko-frontend-browser-.*\", span_name=~\"documentFetch .*\"}[$__rate_interval])) by (le, span_name))",
+          "legendFormat": "{{span_name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Client API Call Duration (p75)",
+      "description": "Browser-side API call latency",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 86 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "lastNotNull"], "sortBy": "Mean", "sortDesc": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(traces_span_metrics_duration_milliseconds_bucket{deployment_environment=\"${environment}\", service_name=~\"nadeshiko-frontend-browser-.*\", span_name=~\"(GET|POST|PATCH|DELETE) /v1/.*\"}[$__rate_interval])) by (le, span_name))",
+          "legendFormat": "{{span_name}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39
+}

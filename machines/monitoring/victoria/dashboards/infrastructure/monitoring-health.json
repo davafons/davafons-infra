@@ -1,0 +1,815 @@
+{
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "title": "Host Data Flow",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 1,
+                "to": 999999,
+                "result": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "expr": "count by (host_name) (system_cpu_time_seconds_total)",
+          "legendFormat": "{{ host_name }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Host Status",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal"
+            },
+            "fillOpacity": 80
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "count by (host_name) (count_over_time({__name__!=\"\", host_name!=\"\"}[$__rate_interval]))",
+          "legendFormat": "{{ host_name }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Active Metric Series by Host",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal"
+            },
+            "fillOpacity": 80
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "count by (service_name) (count_over_time({__name__!=\"\", service_name!=\"\"}[$__rate_interval]))",
+          "legendFormat": "{{ service_name }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Active Metric Series by Service",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "id": 10,
+      "title": "Collector Pipeline \u2014 Receivers",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 14
+      },
+      "id": 11,
+      "targets": [
+        {
+          "expr": "sum by (receiver) (rate(otelcol_receiver_accepted_metric_points_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "{{ receiver }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Received Metric Points / sec",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 14
+      },
+      "id": 12,
+      "targets": [
+        {
+          "expr": "sum by (receiver) (rate(otelcol_receiver_accepted_log_records_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "{{ receiver }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Received Log Records / sec",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 14
+      },
+      "id": 13,
+      "targets": [
+        {
+          "expr": "sum by (receiver) (rate(otelcol_receiver_accepted_spans_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "{{ receiver }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Received Spans / sec",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "id": 20,
+      "title": "Collector Pipeline \u2014 Exporters",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 22
+      },
+      "id": 21,
+      "targets": [
+        {
+          "expr": "sum by (exporter) (rate(otelcol_exporter_sent_metric_points_seconds_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "{{ exporter }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Exported Metric Points / sec",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 22
+      },
+      "id": 22,
+      "targets": [
+        {
+          "expr": "sum by (exporter) (rate(otelcol_exporter_sent_log_records_seconds_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "{{ exporter }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Exported Log Records / sec",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 22
+      },
+      "id": 23,
+      "targets": [
+        {
+          "expr": "sum by (exporter) (rate(otelcol_exporter_sent_spans_seconds_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "{{ exporter }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Exported Spans / sec",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "id": 30,
+      "title": "Collector Pipeline \u2014 Errors & Queue",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 30
+      },
+      "id": 31,
+      "targets": [
+        {
+          "expr": "sum by (receiver) (rate(otelcol_receiver_refused_metric_points_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "refused metrics {{ receiver }}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (receiver) (rate(otelcol_receiver_refused_log_records_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "refused logs {{ receiver }}",
+          "refId": "B"
+        },
+        {
+          "expr": "sum by (receiver) (rate(otelcol_receiver_refused_spans_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "refused spans {{ receiver }}",
+          "refId": "C"
+        }
+      ],
+      "title": "Receiver Refused / sec",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 30
+      },
+      "id": 32,
+      "targets": [
+        {
+          "expr": "sum by (receiver) (rate(otelcol_receiver_failed_metric_points_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "failed metrics {{ receiver }}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (receiver) (rate(otelcol_receiver_failed_log_records_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "failed logs {{ receiver }}",
+          "refId": "B"
+        },
+        {
+          "expr": "sum by (receiver) (rate(otelcol_receiver_failed_spans_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "failed spans {{ receiver }}",
+          "refId": "C"
+        }
+      ],
+      "title": "Receiver Failed / sec",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.5
+              },
+              {
+                "color": "red",
+                "value": 0.8
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 30
+      },
+      "id": 33,
+      "targets": [
+        {
+          "expr": "otelcol_exporter_queue_size_seconds{host_name=~\"${collector:regex}\"} / otelcol_exporter_queue_capacity_seconds{host_name=~\"${collector:regex}\"}",
+          "legendFormat": "{{ exporter }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Exporter Queue Usage %",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "id": 40,
+      "title": "Collector Pipeline \u2014 Processors",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 38
+      },
+      "id": 41,
+      "targets": [
+        {
+          "expr": "sum by (processor, otel_signal) (rate(otelcol_processor_incoming_items_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "{{ processor }} ({{ otel_signal }})",
+          "refId": "A"
+        }
+      ],
+      "title": "Processor Incoming Items / sec",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 38
+      },
+      "id": 42,
+      "targets": [
+        {
+          "expr": "sum by (processor, otel_signal) (rate(otelcol_processor_outgoing_items_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "{{ processor }} ({{ otel_signal }})",
+          "refId": "A"
+        }
+      ],
+      "title": "Processor Outgoing Items / sec",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 45
+      },
+      "id": 43,
+      "targets": [
+        {
+          "expr": "sum by (filter) (rate(otelcol_processor_filter_logs_filtered_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "logs ({{ filter }})",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (filter) (rate(otelcol_processor_filter_datapoints_filtered_total{host_name=~\"${collector:regex}\"}[$__rate_interval]))",
+          "legendFormat": "datapoints ({{ filter }})",
+          "refId": "B"
+        }
+      ],
+      "title": "Filtered (Dropped) Items / sec",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 45
+      },
+      "id": 44,
+      "targets": [
+        {
+          "expr": "otelcol_processor_batch_metadata_cardinality{host_name=~\"${collector:regex}\"}",
+          "legendFormat": "batch cardinality",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(otelcol_processor_batch_timeout_trigger_send_total{host_name=~\"${collector:regex}\"}[$__rate_interval])",
+          "legendFormat": "timeout triggers / sec",
+          "refId": "B"
+        }
+      ],
+      "title": "Batch Processor",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "id": 50,
+      "title": "Collector Resource Usage",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 53
+      },
+      "id": 51,
+      "targets": [
+        {
+          "expr": "rate(otelcol_process_cpu_seconds_total{host_name=~\"${collector:regex}\"}[$__rate_interval]) * 100",
+          "legendFormat": "CPU %",
+          "refId": "A"
+        }
+      ],
+      "title": "Collector CPU",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 53
+      },
+      "id": 52,
+      "targets": [
+        {
+          "expr": "otelcol_process_memory_rss_bytes_seconds{host_name=~\"${collector:regex}\"}",
+          "legendFormat": "RSS",
+          "refId": "A"
+        },
+        {
+          "expr": "otelcol_process_runtime_heap_alloc_bytes_seconds{host_name=~\"${collector:regex}\"}",
+          "legendFormat": "Heap Alloc",
+          "refId": "B"
+        }
+      ],
+      "title": "Collector Memory",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 300
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 53
+      },
+      "id": 53,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "expr": "otelcol_process_uptime_seconds_total{host_name=~\"${collector:regex}\"}",
+          "legendFormat": "central collector",
+          "refId": "A"
+        }
+      ],
+      "title": "Collector Uptime",
+      "type": "stat"
+    }
+  ],
+  "refresh": "1m",
+  "tags": [
+    "infrastructure",
+    "monitoring"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "VictoriaMetrics (Prometheus)",
+          "value": "victoriametrics-prom"
+        },
+        "hide": 2,
+        "name": "datasource",
+        "query": "prometheus",
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(otelcol_process_uptime_seconds_total, host_name)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Collector",
+        "multi": true,
+        "name": "collector",
+        "query": "label_values(otelcol_process_uptime_seconds_total, host_name)",
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Monitoring Health",
+  "uid": "monitoring-health"
+}

@@ -9,4 +9,14 @@ providers:
     disableDeletion: false
     editable: false
     options:
-      path: /var/lib/grafana/dashboards
+      path: /var/lib/grafana/dashboards/infrastructure
+
+  - name: applications
+    orgId: 1
+    folder: Applications
+    folderUid: applications
+    type: file
+    disableDeletion: false
+    editable: false
+    options:
+      path: /var/lib/grafana/dashboards/applications

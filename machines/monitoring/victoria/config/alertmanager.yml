@@ -10,6 +10,6 @@ route:
 
 receivers:
   - name: discord
-    webhook_configs:
-      - url: http://alertmanager-discord:9094
+    discord_configs:
+      - webhook_url: 'DISCORD_WEBHOOK_PLACEHOLDER'
         send_resolved: true

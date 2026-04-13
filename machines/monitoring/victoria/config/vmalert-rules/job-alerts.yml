@@ -1,0 +1,79 @@
+groups:
+  - name: job-queue-alerts
+    interval: 1m
+    rules:
+      - alert: JobQueueFailedJobs
+        expr: |
+          sum by (pgboss_queue, deployment_environment) (
+            pgboss_queue_failed{deployment_environment="production"}
+          ) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          description: "Queue {{ $labels.pgboss_queue }} has {{ $value }} failed jobs"
+          runbook_url: "https://grafana.m.davafons.cc/d/jobs/job-queues"
+
+      - alert: JobQueueBacklogGrowing
+        expr: |
+          sum by (pgboss_queue, deployment_environment) (
+            pgboss_queue_size{deployment_environment="production", pgboss_state="queued"}
+          ) > 500
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          description: "Queue {{ $labels.pgboss_queue }} backlog is {{ $value }} jobs and not draining"
+          runbook_url: "https://grafana.m.davafons.cc/d/jobs/job-queues"
+
+      - alert: JobProcessingSlowP95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, pgboss_queue, deployment_environment) (
+              rate(pgboss_job_duration_seconds_bucket{deployment_environment="production"}[5m])
+            )
+          ) > 30
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          description: "Queue {{ $labels.pgboss_queue }} P95 processing time is {{ $value | printf \"%.1f\" }}s"
+          runbook_url: "https://grafana.m.davafons.cc/d/jobs/job-queues"
+
+  - name: connection-pool-alerts
+    interval: 1m
+    rules:
+      - alert: PgPoolPendingRequests
+        expr: |
+          db_client_connection_pending_requests{
+            deployment_environment="production",
+            service_name=~"nadeshiko-backend-.*",
+            scope_name="nadeshiko-backend"
+          } > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          description: "{{ $labels.service_name }} has {{ $value }} requests waiting for a database connection"
+          runbook_url: "https://grafana.m.davafons.cc/d/jobs/job-queues"
+
+      - alert: PgPoolNearExhaustion
+        expr: |
+          db_client_connection_count{
+            deployment_environment="production",
+            service_name=~"nadeshiko-backend-.*",
+            db_client_connection_state="used",
+            scope_name="nadeshiko-backend"
+          }
+          /
+          db_client_connection_max{
+            deployment_environment="production",
+            service_name=~"nadeshiko-backend-.*",
+            scope_name="nadeshiko-backend"
+          } > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          description: "{{ $labels.service_name }} PG pool is {{ $value | printf \"%.0f\" }}% utilized"
+          runbook_url: "https://grafana.m.davafons.cc/d/jobs/job-queues"

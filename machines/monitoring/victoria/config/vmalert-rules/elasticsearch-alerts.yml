@@ -1,0 +1,37 @@
+groups:
+  - name: elasticsearch-alerts
+    interval: 1m
+    rules:
+      - alert: ElasticsearchClusterRed
+        expr: elasticsearch_cluster_health{status="red"} == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          description: "Elasticsearch cluster on {{ $labels.host_name }} is RED — data loss or unavailability possible"
+
+      - alert: ElasticsearchHeapHigh
+        expr: |
+          jvm_memory_heap_used_bytes / jvm_memory_heap_max_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          description: "Elasticsearch JVM heap on {{ $labels.host_name }} is at {{ $value | printf \"%.0f\" }}%"
+
+      - alert: ElasticsearchDiskLow
+        expr: |
+          (elasticsearch_node_fs_disk_available_bytes / elasticsearch_node_fs_disk_total_bytes) < 0.15
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          description: "Elasticsearch disk on {{ $labels.host_name }} has only {{ $value | printf \"%.1f\" }}% free — risk of read-only index"
+
+      - alert: ElasticsearchPendingTasks
+        expr: elasticsearch_cluster_pending_tasks > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          description: "Elasticsearch on {{ $labels.host_name }} has {{ $value }} pending cluster tasks"

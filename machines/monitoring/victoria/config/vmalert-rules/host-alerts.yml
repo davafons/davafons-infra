@@ -2,32 +2,60 @@ groups:
   - name: host-alerts
     interval: 1m
     rules:
+      - alert: HostDown
+        expr: |
+          absent(system_cpu_time_seconds_total{host_name="nadeshiko"})
+          or absent(system_cpu_time_seconds_total{host_name="monitoring"})
+          or absent(system_cpu_time_seconds_total{host_name="inari"})
+          or absent(system_cpu_time_seconds_total{host_name="watchtower"})
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          description: "A host has stopped sending metrics for more than 5 minutes"
+
       - alert: HostCpuHigh
-        expr: system_cpu_load_average_5m > 4
+        expr: |
+          (
+            1 - avg by (host_name) (rate(system_cpu_time_seconds_total{state="idle"}[5m]))
+          ) > 0.8
         for: 5m
         labels:
           severity: warning
         annotations:
-          description: "5-minute load average on {{ $labels.host_name }} is {{ $value }}"
+          description: "CPU usage on {{ $labels.host_name }} is {{ $value | printf \"%.0f\" }}%"
+          runbook_url: "https://grafana.m.davafons.cc/d/host-monitoring/host-monitoring?var-host_name={{ $labels.host_name }}"
 
       - alert: HostMemoryHigh
         expr: |
           (
-            sum by (host_name) (system_memory_usage{state="used"})
+            sum by (host_name) (system_memory_usage_bytes{state="used"})
             /
-            sum by (host_name) (system_memory_usage)
+            sum by (host_name) (system_memory_usage_bytes)
           ) * 100 > 80
         for: 5m
         labels:
           severity: warning
         annotations:
           description: "Memory usage on {{ $labels.host_name }} is {{ $value | printf \"%.1f\" }}%"
+          runbook_url: "https://grafana.m.davafons.cc/d/host-monitoring/host-monitoring?var-host_name={{ $labels.host_name }}"
 
       - alert: HostDiskLow
         expr: |
-          system_filesystem_usage{state="free", type!~"tmpfs|devtmpfs|squashfs"} < 5368709120
+          system_filesystem_usage_bytes{state="free", type!~"tmpfs|devtmpfs|squashfs|vfat"} < 5368709120
         for: 5m
         labels:
           severity: critical
         annotations:
           description: "Free disk space on {{ $labels.host_name }} ({{ $labels.mountpoint }}) is below 5GB"
+          runbook_url: "https://grafana.m.davafons.cc/d/host-monitoring/host-monitoring?var-host_name={{ $labels.host_name }}"
+
+      - alert: HostDiskWillFill
+        expr: |
+          predict_linear(system_filesystem_usage_bytes{state="free", type!~"tmpfs|devtmpfs|squashfs|vfat"}[6h], 24*3600) < 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          description: "Disk on {{ $labels.host_name }} ({{ $labels.mountpoint }}) is predicted to fill within 24 hours"
+          runbook_url: "https://grafana.m.davafons.cc/d/host-monitoring/host-monitoring?var-host_name={{ $labels.host_name }}"

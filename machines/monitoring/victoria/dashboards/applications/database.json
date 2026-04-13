@@ -1,0 +1,449 @@
+{
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "title": "Overview",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.7 },
+              { "color": "red", "value": 0.9 }
+            ]
+          },
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "expr": "sum(postgresql_backends_ratio{host_name=~\"${host}\", postgresql_database_name=~\"${database}\"}) by (host_name) / sum(postgresql_connection_max{host_name=~\"${host}\"}) by (host_name)",
+          "legendFormat": "{{ host_name }}"
+        }
+      ],
+      "title": "Connection Usage",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "expr": "sum(postgresql_backends_ratio{host_name=~\"${host}\", postgresql_database_name=~\"${database}\"}) by (host_name)",
+          "legendFormat": "{{ host_name }} active"
+        },
+        {
+          "expr": "postgresql_connection_max{host_name=~\"${host}\"}",
+          "legendFormat": "{{ host_name }} max"
+        }
+      ],
+      "title": "Connections (Active / Max)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "postgresql_database_count{host_name=~\"${host}\"}",
+          "legendFormat": "{{ host_name }}"
+        }
+      ],
+      "title": "Databases",
+      "type": "stat"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "sum(postgresql_table_count{host_name=~\"${host}\", postgresql_database_name=~\"${database}\"}) by (host_name)",
+          "legendFormat": "{{ host_name }}"
+        }
+      ],
+      "title": "Total Tables",
+      "type": "stat"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "expr": "sum(postgresql_db_size_bytes{host_name=~\"${host}\", postgresql_database_name=~\"${database}\"}) by (host_name)",
+          "legendFormat": "{{ host_name }}"
+        }
+      ],
+      "title": "Total Size",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "title": "Connections & Transactions",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": ".*max$" },
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "custom.fillOpacity", "value": 0 },
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "postgresql_backends_ratio{host_name=~\"${host}\", postgresql_database_name=~\"${database}\"}",
+          "legendFormat": "{{ host_name }} — {{ postgresql_database_name }}"
+        },
+        {
+          "expr": "postgresql_connection_max{host_name=~\"${host}\"}",
+          "legendFormat": "{{ host_name }} — max"
+        }
+      ],
+      "title": "Active Connections",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "unit": "ops",
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": ".*rollbacks$" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "rate(postgresql_commits_total{host_name=~\"${host}\", postgresql_database_name=~\"${database}\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} — {{ postgresql_database_name }} commits"
+        },
+        {
+          "expr": "rate(postgresql_rollbacks_total{host_name=~\"${host}\", postgresql_database_name=~\"${database}\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} — {{ postgresql_database_name }} rollbacks"
+        }
+      ],
+      "title": "Transaction Rate",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "title": "Storage",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "gradientMode": "scheme"
+          },
+          "unit": "decbytes",
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "postgresql_db_size_bytes{host_name=~\"${host}\", postgresql_database_name=~\"${database}\"}",
+          "legendFormat": "{{ host_name }} — {{ postgresql_database_name }}"
+        }
+      ],
+      "title": "Database Size",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "postgresql_table_count{host_name=~\"${host}\", postgresql_database_name=~\"${database}\"}",
+          "legendFormat": "{{ host_name }} — {{ postgresql_database_name }}"
+        }
+      ],
+      "title": "Table Count",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "title": "Background Writer & Checkpoints",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "barAlignment": 0,
+            "barWidthFactor": 0.9,
+            "stacking": { "mode": "normal" }
+          },
+          "unit": "ops",
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 25 },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "rate(postgresql_bgwriter_checkpoint_count_total{host_name=~\"${host}\", type=\"scheduled\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} — scheduled"
+        },
+        {
+          "expr": "rate(postgresql_bgwriter_checkpoint_count_total{host_name=~\"${host}\", type=\"requested\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} — requested"
+        }
+      ],
+      "title": "Checkpoint Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "barAlignment": 0,
+            "barWidthFactor": 0.9,
+            "stacking": { "mode": "normal" }
+          },
+          "unit": "ops",
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 25 },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "rate(postgresql_bgwriter_buffers_writes_total{host_name=~\"${host}\", source=\"checkpoints\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} — checkpoint writes"
+        },
+        {
+          "expr": "rate(postgresql_bgwriter_buffers_writes_total{host_name=~\"${host}\", source=\"bgwriter\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} — bgwriter writes"
+        },
+        {
+          "expr": "rate(postgresql_bgwriter_buffers_allocated_total{host_name=~\"${host}\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} — allocated"
+        }
+      ],
+      "title": "Buffer Activity",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "barAlignment": 0,
+            "barWidthFactor": 0.9,
+            "stacking": { "mode": "normal" }
+          },
+          "unit": "ms",
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 25 },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "rate(postgresql_bgwriter_duration_milliseconds_total{host_name=~\"${host}\", type=\"write\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} — write"
+        },
+        {
+          "expr": "rate(postgresql_bgwriter_duration_milliseconds_total{host_name=~\"${host}\", type=\"sync\"}[$__rate_interval])",
+          "legendFormat": "{{ host_name }} — sync"
+        }
+      ],
+      "title": "Checkpoint Duration",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "tags": ["infrastructure", "database"],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "VictoriaMetrics (Prometheus)",
+          "value": "victoriametrics-prom"
+        },
+        "hide": 2,
+        "name": "datasource",
+        "query": "prometheus",
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": { "uid": "${datasource}" },
+        "includeAll": true,
+        "multi": true,
+        "name": "host",
+        "label": "Host",
+        "query": "label_values(postgresql_connection_max, host_name)",
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": { "uid": "${datasource}" },
+        "includeAll": true,
+        "multi": true,
+        "name": "database",
+        "label": "Database",
+        "query": "label_values(postgresql_db_size_bytes{host_name=~\"${host}\"}, postgresql_database_name)",
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Database Monitoring",
+  "uid": "database-monitoring"
+}

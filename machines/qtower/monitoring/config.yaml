@@ -195,7 +195,7 @@ processors:
         - 'not IsMatch(resource.attributes["container.name"], "^(homeassistant|syncthing|restic-backup|restic-rest-server)$")'
 
 exporters:
-  otlp_grpc:
+  otlp:
     endpoint: ${env:OTEL_ENDPOINT}
     tls:
       insecure: true
@@ -204,6 +204,7 @@ exporters:
       enabled: true
       num_consumers: 10
       queue_size: 5000
+      batch:
     retry_on_failure:
       enabled: true
       initial_interval: 5s
@@ -214,12 +215,19 @@ service:
   telemetry:
     logs:
       encoding: json
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: "0.0.0.0"
+                port: 8888
   pipelines:
     metrics:
       receivers: [hostmetrics, docker_stats]
       processors: [memory_limiter, resourcedetection, transform/hostname, batch]
-      exporters: [otlp_grpc]
+      exporters: [otlp]
     logs:
       receivers: [file_log/docker]
       processors: [memory_limiter, resourcedetection, transform/hostname, filter/keep_essential, batch]
-      exporters: [otlp_grpc]
+      exporters: [otlp]

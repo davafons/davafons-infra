@@ -1,0 +1,97 @@
+groups:
+  - name: application-alerts
+    interval: 1m
+    rules:
+      - alert: High5xxErrorRate
+        expr: |
+          (
+            sum by (service_name, deployment_environment) (
+              rate(http_server_request_duration_seconds_count{
+                scope_name!="@opentelemetry/instrumentation-http",
+                http_route!~"/__.*",
+                deployment_environment="production",
+                http_response_status_code=~"5.."
+              }[5m])
+            )
+            /
+            sum by (service_name, deployment_environment) (
+              rate(http_server_request_duration_seconds_count{
+                scope_name!="@opentelemetry/instrumentation-http",
+                http_route!~"/__.*",
+                deployment_environment="production"
+              }[5m])
+            )
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          description: "{{ $labels.service_name }} 5xx error rate is {{ $value | printf \"%.1f\" }}%"
+          runbook_url: "https://grafana.m.davafons.cc/d/apm/apm"
+
+      - alert: High4xxErrorRate
+        expr: |
+          (
+            sum by (service_name, deployment_environment) (
+              rate(http_server_request_duration_seconds_count{
+                scope_name!="@opentelemetry/instrumentation-http",
+                http_route!~"/__.*",
+                deployment_environment="production",
+                http_response_status_code=~"4.."
+              }[5m])
+            )
+            /
+            sum by (service_name, deployment_environment) (
+              rate(http_server_request_duration_seconds_count{
+                scope_name!="@opentelemetry/instrumentation-http",
+                http_route!~"/__.*",
+                deployment_environment="production"
+              }[5m])
+            )
+          ) > 0.15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          description: "{{ $labels.service_name }} 4xx error rate is {{ $value | printf \"%.1f\" }}%"
+          runbook_url: "https://grafana.m.davafons.cc/d/apm/apm"
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, service_name, deployment_environment) (
+              rate(http_server_request_duration_seconds_bucket{
+                scope_name!="@opentelemetry/instrumentation-http",
+                http_route!~"/__.*",
+                deployment_environment="production"
+              }[5m])
+            )
+          ) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          description: "{{ $labels.service_name }} P95 latency is {{ $value | printf \"%.2f\" }}s"
+          runbook_url: "https://grafana.m.davafons.cc/d/apm/apm"
+
+      - alert: ErrorSpike
+        expr: |
+          (
+            sum by (service_name) (
+              rate(app_exception_bytes_total{deployment_environment="production"}[5m])
+            )
+            > 3 *
+            sum by (service_name) (
+              rate(app_exception_bytes_total{deployment_environment="production"}[1h])
+            )
+          )
+          and
+          sum by (service_name) (
+            rate(app_exception_bytes_total{deployment_environment="production"}[5m])
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          description: "{{ $labels.service_name }} error rate spiked to {{ $value | printf \"%.2f\" }}/s (3x above 1h average)"
+          runbook_url: "https://grafana.m.davafons.cc/d/exceptions/exceptions"

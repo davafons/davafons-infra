@@ -55,6 +55,9 @@ HAS_ELASTICSEARCH=false
 if [[ -n "${ELASTICSEARCH_URL:-}" ]]; then
   HAS_ELASTICSEARCH=true
   info "Elasticsearch URL found — will enable elasticsearch receiver"
+  if [[ -n "${ELASTICSEARCH_USER:-}" ]]; then
+    info "Elasticsearch auth found — will configure username/password"
+  fi
 fi
 
 # --- Uninstall Grafana Alloy (if present) ---
@@ -78,7 +81,7 @@ fi
 # --- Install otelcol-contrib ---
 info "Installing OpenTelemetry Collector Contrib..."
 
-OTELCOL_VERSION="0.120.0"
+OTELCOL_VERSION="0.149.0"
 ARCH=$(dpkg --print-architecture)
 
 curl -fsSL "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${OTELCOL_VERSION}/otelcol-contrib_${OTELCOL_VERSION}_linux_${ARCH}.deb" \
@@ -299,19 +302,23 @@ receivers:
       - type: remove
         if: attributes.attrs != nil
         field: attributes.attrs
-      # Correlate logs with traces (Pino injects traceId/spanId via OTel mixin)
+      # Correlate logs with traces
+      # @opentelemetry/instrumentation-pino injects trace_id/span_id (underscore format)
       - type: trace_parser
-        if: attributes.traceId != nil
+        if: attributes.trace_id != nil
         trace_id:
-          parse_from: attributes.traceId
+          parse_from: attributes.trace_id
         span_id:
-          parse_from: attributes.spanId
+          parse_from: attributes.span_id
       - type: remove
-        if: attributes.traceId != nil
-        field: attributes.traceId
+        if: attributes.trace_id != nil
+        field: attributes.trace_id
       - type: remove
-        if: attributes.spanId != nil
-        field: attributes.spanId
+        if: attributes.span_id != nil
+        field: attributes.span_id
+      - type: remove
+        if: attributes.trace_flags != nil
+        field: attributes.trace_flags
 
   # --- System logs (journald) ---
   journald:
@@ -351,6 +358,15 @@ receivers:
         from: body.MESSAGE
         to: body
 
+  # --- Self-telemetry (collector health metrics) ---
+  prometheus/self:
+    config:
+      scrape_configs:
+        - job_name: otelcol-edge
+          scrape_interval: 60s
+          static_configs:
+            - targets: ['localhost:8888']
+
   # --- OTLP receiver (for instrumented apps) ---
   # Uses non-standard ports to avoid conflicts with the central otel-collector on the monitoring server
   # Listens on 0.0.0.0 so Docker containers on bridge networks can reach it via host.docker.internal
@@ -372,17 +388,33 @@ cat >> /etc/otelcol-contrib/config.yaml <<'OTELCOL_POSTGRES'
     transport: tcp
     username: ${env:POSTGRES_USER}
     password: ${env:POSTGRES_PASSWORD}
-    databases:
-      - ${env:POSTGRES_DB}
     collection_interval: 60s
     tls:
       insecure: true
+    events:
+      db.server.top_query:
+        enabled: true
+    top_query_collection:
+      top_n_query: 50
 
 OTELCOL_POSTGRES
 fi
 
 # --- Optional: Elasticsearch receiver ---
 if $HAS_ELASTICSEARCH; then
+if [[ -n "${ELASTICSEARCH_USER:-}" ]]; then
+cat >> /etc/otelcol-contrib/config.yaml <<'OTELCOL_ELASTICSEARCH_AUTH'
+  # --- Elasticsearch metrics ---
+  elasticsearch:
+    endpoint: ${env:ELASTICSEARCH_URL}
+    username: ${env:ELASTICSEARCH_USER}
+    password: ${env:ELASTICSEARCH_PASSWORD}
+    collection_interval: 60s
+    nodes: ["_local"]
+    skip_cluster_metrics: false
+
+OTELCOL_ELASTICSEARCH_AUTH
+else
 cat >> /etc/otelcol-contrib/config.yaml <<'OTELCOL_ELASTICSEARCH'
   # --- Elasticsearch metrics ---
   elasticsearch:
@@ -392,6 +424,7 @@ cat >> /etc/otelcol-contrib/config.yaml <<'OTELCOL_ELASTICSEARCH'
     skip_cluster_metrics: false
 
 OTELCOL_ELASTICSEARCH
+fi
 fi
 
 # --- Processors, exporters, service ---
@@ -459,6 +492,9 @@ processors:
       log_record:
         - 'attributes["container.name"] != nil and IsMatch(attributes["container.name"], "^(otelcol|.*redis.*|adminer|pgadmin|autokuma)")'
 
+connectors:
+  spanmetrics:
+
 exporters:
   otlp:
     endpoint: ${env:OTEL_ENDPOINT}
@@ -479,11 +515,24 @@ service:
   telemetry:
     logs:
       encoding: json
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: "0.0.0.0"
+                port: 8888
   pipelines:
     metrics:
-      receivers: [otlp, hostmetrics, docker_stats]
+      receivers: [otlp, hostmetrics, docker_stats, spanmetrics, prometheus/self]
       processors: [memory_limiter, resourcedetection, batch]
       exporters: [otlp]
+    # Pre-sampling pipeline: generates accurate RED metrics from ALL traces
+    traces/spanmetrics:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/drop_health, transform/normalize_spans]
+      exporters: [spanmetrics]
+    # Main pipeline: samples traces before shipping to central
     traces:
       receivers: [otlp]
       processors: [memory_limiter, resourcedetection, filter/drop_health, transform/normalize_spans, tail_sampling, batch]
@@ -494,9 +543,11 @@ service:
       exporters: [otlp]
 OTELCOL_SERVICE
 
-# Add optional receivers to metrics pipeline
+# Add optional receivers to metrics and logs pipelines
 if $HAS_POSTGRES; then
   sed -i 's/receivers: \[otlp, hostmetrics, docker_stats\]/receivers: [otlp, hostmetrics, docker_stats, postgresql]/' /etc/otelcol-contrib/config.yaml
+  # Add to logs pipeline for top_query events
+  sed -i 's/receivers: \[otlp, filelog\/docker, journald\]/receivers: [otlp, filelog\/docker, journald, postgresql]/' /etc/otelcol-contrib/config.yaml
 fi
 
 if $HAS_ELASTICSEARCH; then
@@ -531,6 +582,12 @@ if $HAS_ELASTICSEARCH; then
   cat >> /etc/otelcol-contrib/environment <<EOF
 ELASTICSEARCH_URL=${ELASTICSEARCH_URL}
 EOF
+  if [[ -n "${ELASTICSEARCH_USER:-}" ]]; then
+    cat >> /etc/otelcol-contrib/environment <<EOF
+ELASTICSEARCH_USER=${ELASTICSEARCH_USER}
+ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD}
+EOF
+  fi
 fi
 
 chmod 600 /etc/otelcol-contrib/environment

@@ -10,6 +10,7 @@ services:
       - "--search.latencyOffset=5s"
       - "--opentelemetry.usePrometheusNaming=true"
       - "--enableMetadata=true"
+      - "--vmalert.proxyURL=http://vmalert:8880/"
     ports:
       - "127.0.0.1:8428:8428"
       - "${TAILSCALE_IP}:8428:8428"
@@ -54,6 +55,7 @@ services:
       - "--storageDataPath=/storage"
       - "--httpListenAddr=:10428"
       - "--retentionPeriod=8w"
+      - "--servicegraph.enableTask=true"
     volumes:
       - vm_traces_data:/storage
     deploy:
@@ -66,7 +68,7 @@ services:
         max-file: "3"
 
   otelcol:
-    image: otel/opentelemetry-collector-contrib:0.142.0
+    image: otel/opentelemetry-collector-contrib:0.149.0
     container_name: otelcol
     restart: unless-stopped
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
@@ -101,6 +103,7 @@ services:
       - "--remoteRead.url=http://victoriametrics:8428/"
       - "--remoteWrite.url=http://victoriametrics:8428/"
       - "--notifier.url=http://alertmanager:9093/"
+      - "--external.url=https://vmui.m.davafons.cc"
       - "--rule=/etc/alerts/*.yml"
     volumes:
       - ./config/vmalert-rules:/etc/alerts:ro
@@ -120,27 +123,18 @@ services:
     image: prom/alertmanager:v0.27.0
     container_name: alertmanager
     restart: unless-stopped
-    command: ["--config.file=/config/alertmanager.yml"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        sed "s|DISCORD_WEBHOOK_PLACEHOLDER|$$DISCORD_ALERT_WEBHOOK_URL|" /config/alertmanager.yml.tmpl > /tmp/alertmanager.yml
+        exec /bin/alertmanager --config.file=/tmp/alertmanager.yml
     ports:
       - "127.0.0.1:9093:9093"
-    volumes:
-      - ./config/alertmanager.yml:/config/alertmanager.yml:ro
-    deploy:
-      resources:
-        limits:
-          memory: 64M
-    logging:
-      options:
-        max-size: 50m
-        max-file: "3"
-
-  alertmanager-discord:
-    image: rogerrum/alertmanager-discord:latest
-    container_name: alertmanager-discord
-    restart: unless-stopped
+      - "${TAILSCALE_IP}:9093:9093"
     environment:
-      - DISCORD_WEBHOOK=${DISCORD_ALERT_WEBHOOK_URL}
-      - DISCORD_USERNAME=Victoria Alerts
+      - DISCORD_ALERT_WEBHOOK_URL=${DISCORD_ALERT_WEBHOOK_URL}
+    volumes:
+      - ./config/alertmanager.yml:/config/alertmanager.yml.tmpl:ro
     deploy:
       resources:
         limits:

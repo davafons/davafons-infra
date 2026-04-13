@@ -6,6 +6,13 @@ receivers:
         max_recv_msg_size_mib: 16
       http:
         endpoint: 0.0.0.0:4318
+  prometheus/self:
+    config:
+      scrape_configs:
+        - job_name: otelcol-central
+          scrape_interval: 60s
+          static_configs:
+            - targets: ['localhost:8888']
 
 processors:
   memory_limiter:
@@ -94,6 +101,11 @@ processors:
           - set(attributes["duration_ms"], Int(attributes["duration"]) / 1000000) where attributes["duration"] != nil and not IsMatch(attributes["duration"], ".*[a-z].*")
           - delete_key(attributes, "duration") where attributes["duration_ms"] != nil
 
+          # === Fallback: default unspecified severity to INFO ===
+          # Covers both severity_number=0 (OTLP default) and severity_text="Unspecified" (postgresql receiver)
+          - set(severity_number, SEVERITY_NUMBER_INFO) where severity_number == 0 or severity_text == "Unspecified"
+          - set(severity_text, "INFO") where severity_text == "" or severity_text == "Unspecified"
+
           # === General cleanup ===
           - delete_key(attributes, "req_last_modified")
           - delete_key(attributes, "req_cache_control")
@@ -142,9 +154,6 @@ processors:
           - set(name, "") where IsMatch(name, "^github\\.com/.*")
           - set(version, "") where version == "unknown"
 
-connectors:
-  spanmetrics:
-
 exporters:
   otlphttp/victoriametrics:
     endpoint: http://victoriametrics:8428/opentelemetry
@@ -181,13 +190,20 @@ service:
   telemetry:
     logs:
       encoding: json
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: "0.0.0.0"
+                port: 8888
   pipelines:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [otlphttp/victoriatraces, spanmetrics]
+      exporters: [otlphttp/victoriatraces]
     metrics:
-      receivers: [otlp, spanmetrics]
+      receivers: [otlp, prometheus/self]
       processors: [memory_limiter, filter/drop_health_metrics, transform/cleanup_metrics, batch]
       exporters: [otlphttp/victoriametrics]
     logs:

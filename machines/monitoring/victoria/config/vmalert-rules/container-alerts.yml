@@ -4,9 +4,22 @@ groups:
     rules:
       - alert: ContainerMemoryHigh
         expr: |
-          avg by (host_name, container_name) (container_memory_percent) > 80
+          avg by (host_name, container_name) (container_memory_percent_ratio) > 80
         for: 5m
         labels:
           severity: warning
         annotations:
           description: "Container {{ $labels.container_name }} on {{ $labels.host_name }} is using {{ $value | printf \"%.1f\" }}% of its memory limit"
+          runbook_url: "https://grafana.m.davafons.cc/d/container-monitoring/container-monitoring?var-host_name={{ $labels.host_name }}"
+
+      - alert: ContainerRestarting
+        expr: |
+          max by (host_name, container_name) (
+            resets(container_cpu_usage_nanoseconds_total{container_name!="grafana"}[15m])
+          ) > 2
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          description: "Container {{ $labels.container_name }} on {{ $labels.host_name }} has restarted {{ $value }} times in the last 15 minutes"
+          runbook_url: "https://grafana.m.davafons.cc/d/container-monitoring/container-monitoring?var-host_name={{ $labels.host_name }}"
