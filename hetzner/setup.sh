@@ -318,13 +318,15 @@ chown -R docker:docker /home/docker
 chmod 750 /home/docker
 
 # --- Firewall ---
-# Tailscale is up, so we can safely lock out port 22
-log "Configuring firewall (Tailscale-only SSH)..."
+log "Configuring firewall..."
 ufw --force reset
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow in on tailscale0        # Allow all traffic over Tailscale
-# NOTE: Port 22 is intentionally NOT opened. SSH only via Tailscale.
+if [[ "${KEEP_OPENSSH:-}" == "true" ]]; then
+  ufw allow 22/tcp                # Keep SSH accessible for fallback access
+  log "Port 22 open (KEEP_OPENSSH=true)"
+fi
 # NOTE: HTTP/HTTPS restricted to Cloudflare IPs only (added below).
 ufw --force enable
 
@@ -340,10 +342,16 @@ sed -i 's/^#\?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config
 sed -i 's/^#\?MaxSessions.*/MaxSessions 2/' /etc/ssh/sshd_config
 sed -i 's/^#\?AllowTcpForwarding.*/AllowTcpForwarding no/' /etc/ssh/sshd_config
 
-# --- Disable OpenSSH (Tailscale SSH handles all access) ---
-log "Disabling OpenSSH (using Tailscale SSH instead)..."
-systemctl disable ssh 2>/dev/null || true
-systemctl stop ssh 2>/dev/null || true
+# --- OpenSSH ---
+if [[ "${KEEP_OPENSSH:-}" == "true" ]]; then
+  log "Keeping OpenSSH enabled (KEEP_OPENSSH=true)"
+  systemctl enable ssh 2>/dev/null || true
+  systemctl restart ssh 2>/dev/null || true
+else
+  log "Disabling OpenSSH (using Tailscale SSH instead)..."
+  systemctl disable ssh 2>/dev/null || true
+  systemctl stop ssh 2>/dev/null || true
+fi
 
 # --- Configuration Files ---
 log "Installing configuration files..."

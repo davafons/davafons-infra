@@ -16,12 +16,17 @@ processors:
     send_batch_size: 10000
     send_batch_max_size: 11000
     timeout: 10s
+  filter/drop_health_metrics:
+    error_mode: ignore
+    metrics:
+      datapoint:
+        - 'attributes["http.route"] == "/up"'
   filter/drop_noisy_logs:
     error_mode: ignore
     logs:
       log_record:
-        # Drop entire hosts
-        - 'IsMatch(resource.attributes["host.name"], "(?i)watchtower")'
+        # Drop watchtower container logs except restic-backup (journald passes through)
+        - 'IsMatch(resource.attributes["host.name"], "(?i)watchtower") and resource.attributes["container.name"] != nil and resource.attributes["container.name"] != "restic-backup"'
         # Drop non-critical infrastructure containers
         - 'IsMatch(resource.attributes["container.name"], "^(nadeshiko-status|otelcol|alertmanager-discord|signoz-.*|caddy|pgadmin|cloudflared)$")'
         # Drop noisy journald sources
@@ -108,6 +113,49 @@ processors:
           - delete_key(attributes, "req_cache_control")
           - delete_key(attributes, "req_user_agent")
 
+  transform/cleanup_metrics:
+    error_mode: ignore
+    metric_statements:
+      # Strip high-cardinality process labels from resource attributes
+      - context: resource
+        statements:
+          - delete_key(attributes, "process.pid")
+          - delete_key(attributes, "process.executable.name")
+          - delete_key(attributes, "process.executable.path")
+          - delete_key(attributes, "process.command")
+          - delete_key(attributes, "process.command_line")
+          - delete_key(attributes, "process.command_args")
+          - delete_key(attributes, "process.owner")
+          - delete_key(attributes, "process.parent_pid")
+          - delete_key(attributes, "process.runtime.name")
+          - delete_key(attributes, "process.runtime.version")
+          - delete_key(attributes, "process.runtime.description")
+          - delete_key(attributes, "os.type")
+          - delete_key(attributes, "host.arch")
+          - delete_key(attributes, "service.version") where attributes["service.version"] == "0.0.0"
+      # Normalize high-cardinality metric attributes and drop noise
+      - context: datapoint
+        statements:
+          # === Normalize http_route: collapse raw IDs/UUIDs into parameterized paths ===
+          - replace_pattern(attributes["http.route"], "/v1/media/segments/[^/]+", "/v1/media/segments/:uuid")
+          - replace_pattern(attributes["http.route"], "/v1/collections/[^/]+", "/v1/collections/:id")
+          - replace_pattern(attributes["http.route"], "/v1/media/[^/]+$$", "/v1/media/:id")
+          - replace_pattern(attributes["http.route"], "/user/[^/]+$$", "/user/:slug")
+          # Nuxt static assets
+          - replace_pattern(attributes["http.route"], "/_nuxt/.*", "/_nuxt/:asset")
+          # === Drop useless metric labels ===
+          - delete_key(attributes, "url.scheme")
+          - delete_key(attributes, "network.protocol.version")
+          - delete_key(attributes, "client.connection.downlink")
+          - delete_key(attributes, "client.connection.effective_type")
+          - delete_key(attributes, "client.connection.rtt")
+          - delete_key(attributes, "client.connection.save_data")
+      # Clear useless scope metadata
+      - context: scope
+        statements:
+          - set(name, "") where IsMatch(name, "^github\\.com/.*")
+          - set(version, "") where version == "unknown"
+
 connectors:
   spanmetrics:
 
@@ -154,7 +202,7 @@ service:
       exporters: [otlphttp/victoriatraces, spanmetrics]
     metrics:
       receivers: [otlp, spanmetrics]
-      processors: [memory_limiter, batch]
+      processors: [memory_limiter, filter/drop_health_metrics, transform/cleanup_metrics, batch]
       exporters: [otlphttp/victoriametrics]
     logs:
       receivers: [otlp]

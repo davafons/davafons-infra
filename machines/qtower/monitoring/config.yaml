@@ -205,12 +205,23 @@ processors:
           enabled: true
         os.type:
           enabled: false
-  # Drop logs from noisy low-value containers
-  filter/drop_noisy:
+  # Override hostname to lowercase (Unraid uses "QTower")
+  transform/hostname:
+    error_mode: ignore
+    log_statements:
+      - context: resource
+        statements:
+          - set(attributes["host.name"], "qtower") where attributes["host.name"] == "QTower"
+    metric_statements:
+      - context: resource
+        statements:
+          - set(attributes["host.name"], "qtower") where attributes["host.name"] == "QTower"
+  # Only keep homeassistant and syncthing container logs
+  filter/keep_essential:
     error_mode: ignore
     logs:
       log_record:
-        - 'attributes["container.name"] != nil and IsMatch(attributes["container.name"], "^(otelcol-contrib|.*redis.*|adminer|pgadmin)")'
+        - 'not IsMatch(resource.attributes["container.name"], "^(homeassistant|syncthing|restic-backup|restic-rest-server)$")'
 
 exporters:
   otlp_grpc:
@@ -235,9 +246,9 @@ service:
   pipelines:
     metrics:
       receivers: [hostmetrics, docker_stats]
-      processors: [memory_limiter, resourcedetection, batch]
+      processors: [memory_limiter, resourcedetection, transform/hostname, batch]
       exporters: [otlp_grpc]
     logs:
-      receivers: [file_log/docker, file_log/syslog]
-      processors: [memory_limiter, resourcedetection, filter/drop_noisy, batch]
+      receivers: [file_log/docker]
+      processors: [memory_limiter, resourcedetection, transform/hostname, filter/keep_essential, batch]
       exporters: [otlp_grpc]
