@@ -1,11 +1,12 @@
 apiVersion: 1
 
 providers:
-  - name: default
+  - name: infrastructure
     orgId: 1
-    folder: ''
+    folder: Infrastructure
+    folderUid: infrastructure
     type: file
     disableDeletion: false
-    editable: true
+    editable: false
     options:
       path: /var/lib/grafana/dashboards

@@ -28,12 +28,20 @@ processors:
         # Drop watchtower container logs except restic-backup (journald passes through)
         - 'IsMatch(resource.attributes["host.name"], "(?i)watchtower") and resource.attributes["container.name"] != nil and resource.attributes["container.name"] != "restic-backup"'
         # Drop non-critical infrastructure containers
-        - 'IsMatch(resource.attributes["container.name"], "^(nadeshiko-status|otelcol|alertmanager-discord|signoz-.*|caddy|pgadmin|cloudflared)$")'
+        - 'IsMatch(resource.attributes["container.name"], "^(nadeshiko-status|otelcol|alertmanager-discord|caddy|pgadmin|cloudflared)$")'
         # Drop noisy journald sources
         - 'IsMatch(attributes["syslog.identifier"], "^(otelcol-contrib|tailscaled|cloud-init-hotplugd|networkctl|containerd|networkd-dispatcher|CRON|\\(sd-pam\\)|\\(systemd\\))$")'
   transform/cleanup_logs:
     error_mode: ignore
     log_statements:
+      - context: resource
+        statements:
+          # Normalize hostname: QTower -> qtower
+          - set(attributes["host.name"], "qtower") where attributes["host.name"] == "QTower"
+          # Default deployment.environment for journald/syslog logs that lack it
+          - set(attributes["deployment.environment"], "infrastructure") where attributes["deployment.environment"] == nil
+          # Default service.name to host.name for logs that lack it
+          - set(attributes["service.name"], attributes["host.name"]) where attributes["service.name"] == nil
       - context: log
         statements:
           # === Normalize useful backend headers before bulk deletion ===
@@ -46,33 +54,11 @@ processors:
           # === Drop log.raw — parsed fields cover everything ===
           - delete_key(attributes, "log.raw")
 
-          # === Drop entire nested maps for res.headers, req.body, req.query ===
+          # === Drop entire nested maps — useful headers already extracted to http.* above ===
           - delete_key(attributes["res"], "headers")
+          - delete_key(attributes["req"], "headers")
           - delete_key(attributes["req"], "body")
           - delete_key(attributes["req"], "query")
-          # Drop Caddy's nested request.headers
-          - delete_key(attributes["request"], "headers")
-
-          # === Drop noisy request headers (nested map keys) ===
-          - delete_key(attributes["req"]["headers"], "cookie")
-          - delete_key(attributes["req"]["headers"], "authorization")
-          - delete_key(attributes["req"]["headers"], "content-length")
-          - delete_key(attributes["req"]["headers"], "content-type")
-          - delete_key(attributes["req"]["headers"], "sec-ch-ua")
-          - delete_key(attributes["req"]["headers"], "sec-fetch-dest")
-          - delete_key(attributes["req"]["headers"], "sec-fetch-site")
-          - delete_key(attributes["req"]["headers"], "sec-fetch-user")
-          - delete_key(attributes["req"]["headers"], "sec-gpc")
-          - delete_key(attributes["req"]["headers"], "dnt")
-          - delete_key(attributes["req"]["headers"], "priority")
-          - delete_key(attributes["req"]["headers"], "cdn-loop")
-          - delete_key(attributes["req"]["headers"], "cf-visitor")
-          - delete_key(attributes["req"]["headers"], "upgrade-insecure-requests")
-          - delete_key(attributes["req"]["headers"], "accept-encoding")
-          - delete_key(attributes["req"]["headers"], "traceparent")
-          - delete_key(attributes["req"]["headers"], "x-kamal-target")
-          - delete_key(attributes["req"]["headers"], "x-request-start")
-          - delete_key(attributes["req"]["headers"], "x-forwarded-proto")
 
           # === Fix severity for plain-text logs that edge collectors missed ===
           # Tab-separated format: VictoriaMetrics, vmalert, victorialogs, victoriatraces
@@ -171,7 +157,7 @@ exporters:
     headers:
       VL-Msg-Field: body
       VL-Time-Field: observedTimestamp
-      VL-Ignore-Fields: scope.name,scope.version,os.type
+      VL-Ignore-Fields: scope.name,scope.version,os.type,process.command_line
       VL-Stream-Fields: service.name,host.name,deployment.environment
     tls:
       insecure: true

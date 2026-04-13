@@ -82,16 +82,11 @@ receivers:
       # Route logs by container type for format-specific parsing
       - type: router
         routes:
-          - output: json-raw-copy
+          - output: json-parser
             expr: 'body matches "^\\{"'
         default: severity-parser
 
       # === Structured JSON logs (Pino, Winston, etc.) ===
-      - id: json-raw-copy
-        type: copy
-        from: body
-        to: attributes["log.raw"]
-        output: json-parser
       - id: json-parser
         type: json_parser
         parse_from: body
@@ -161,30 +156,6 @@ receivers:
         if: attributes.attrs != nil
         field: attributes.attrs
 
-  # --- System logs (syslog — Unraid uses syslog, not journald) ---
-  file_log/syslog:
-    include: [/var/log/host/syslog, /var/log/host/messages]
-    start_at: end
-    operators:
-      - type: add
-        field: attributes.log.source
-        value: syslog
-      - type: add
-        field: resource["service.name"]
-        value: unraid-system
-      - type: add
-        field: resource["deployment.environment"]
-        value: infrastructure
-      # Parse syslog format: "Apr 12 10:30:01 hostname process[pid]: message"
-      - type: regex_parser
-        if: body matches "^[A-Z][a-z]{2}\\s"
-        parse_from: body
-        regex: '^(?P<timestamp>[A-Z][a-z]{2}\s+\d{1,2}\s\d{2}:\d{2}:\d{2})\s+(?P<hostname>\S+)\s+(?P<process>[^\[:]+)(?:\[(?P<pid>\d+)\])?:\s+(?P<message>.*)'
-        parse_to: attributes
-      - type: move
-        if: attributes.message != nil
-        from: attributes.message
-        to: body
 
 processors:
   memory_limiter:
