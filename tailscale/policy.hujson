@@ -3,7 +3,7 @@
 {
 	"groups": {
 		// The one person who needs access to nadeshiko
-		"group:nadeshiko-users": ["jonathan.197ariza@gmail.com"],
+		"group:nadeshiko-users": ["jonathan.197ariza@gmail.com", "xyaman@github"],
 	},
 
 	"tagOwners": {
