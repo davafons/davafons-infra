@@ -1,0 +1,200 @@
+{
+  "uid": "user-analytics",
+  "title": "User Analytics",
+  "tags": ["nadeshiko", "analytics"],
+  "timezone": "browser",
+  "refresh": "",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Activity Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+      "targets": [
+        {
+          "rawSql": "SELECT\n  date_trunc('hour', created_at) AS time,\n  activity_type AS metric,\n  COUNT(*) AS value\nFROM \"UserActivity\"\nWHERE created_at BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1, 2\nORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "stacking": { "mode": "normal" },
+            "fillOpacity": 80,
+            "pointSize": 5
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "Daily Active Users",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+      "targets": [
+        {
+          "rawSql": "SELECT\n  date_trunc('day', created_at) AS time,\n  COUNT(DISTINCT user_id) AS \"Active Users\"\nFROM \"UserActivity\"\nWHERE created_at BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1\nORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "pointSize": 5,
+            "showPoints": "always"
+          },
+          "color": { "mode": "fixed", "fixedColor": "green" }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Top Searches",
+      "description": "Most popular search queries in the selected time range",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+      "targets": [
+        {
+          "rawSql": "SELECT\n  search_query AS \"Search Query\",\n  COUNT(*) AS \"Count\",\n  COUNT(DISTINCT user_id) AS \"Unique Users\"\nFROM \"UserActivity\"\nWHERE activity_type = 'SEARCH'\n  AND search_query IS NOT NULL\n  AND created_at BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY search_query\nORDER BY \"Count\" DESC\nLIMIT 30",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Count" },
+            "properties": [{ "id": "custom.width", "value": 80 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Unique Users" },
+            "properties": [{ "id": "custom.width", "value": 110 }]
+          }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "title": "Top Media",
+      "description": "Most accessed media content",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+      "targets": [
+        {
+          "rawSql": "SELECT\n  COALESCE(a.anime_name, m.romaji_name, m.english_name, 'Unknown') AS \"Media\",\n  COUNT(*) AS \"Total Activity\",\n  COUNT(*) FILTER (WHERE a.activity_type = 'SEGMENT_PLAY') AS \"Plays\",\n  COUNT(*) FILTER (WHERE a.activity_type = 'ANKI_EXPORT') AS \"Exports\",\n  COUNT(*) FILTER (WHERE a.activity_type = 'SEARCH') AS \"Searches\",\n  COUNT(DISTINCT a.user_id) AS \"Unique Users\"\nFROM \"UserActivity\" a\nLEFT JOIN \"Media\" m ON m.id = a.media_id\nWHERE a.created_at BETWEEN $__timeFrom() AND $__timeTo()\n  AND a.media_id IS NOT NULL\nGROUP BY 1\nORDER BY \"Total Activity\" DESC\nLIMIT 20",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Total Activity" },
+            "properties": [{ "id": "custom.width", "value": 110 }]
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "title": "Activity Totals",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 18 },
+      "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+      "targets": [
+        {
+          "rawSql": "SELECT\n  COUNT(*) FILTER (WHERE activity_type = 'SEARCH') AS \"Searches\",\n  COUNT(*) FILTER (WHERE activity_type = 'SEGMENT_PLAY') AS \"Segment Plays\",\n  COUNT(*) FILTER (WHERE activity_type = 'ANKI_EXPORT') AS \"Anki Exports\",\n  COUNT(*) FILTER (WHERE activity_type = 'SHARE') AS \"Shares\",\n  COUNT(DISTINCT user_id) AS \"Unique Users\"\nFROM \"UserActivity\"\nWHERE created_at BETWEEN $__timeFrom() AND $__timeTo()",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "colorMode": "background_gradient",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 6,
+      "title": "Top Database Queries",
+      "description": "Most expensive queries from pg_stat_statements (cumulative since last reset)",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 22 },
+      "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+      "targets": [
+        {
+          "rawSql": "SELECT\n  LEFT(query, 120) AS \"Query\",\n  calls AS \"Calls\",\n  ROUND(total_exec_time::numeric / 1000, 2) AS \"Total Time (s)\",\n  ROUND(mean_exec_time::numeric, 2) AS \"Mean (ms)\",\n  ROUND(max_exec_time::numeric, 2) AS \"Max (ms)\",\n  rows AS \"Rows\",\n  CASE WHEN shared_blks_hit + shared_blks_read > 0\n    THEN ROUND(100.0 * shared_blks_hit / (shared_blks_hit + shared_blks_read), 1)\n    ELSE 100\n  END AS \"Cache Hit %\"\nFROM pg_stat_statements\nWHERE dbid = (SELECT oid FROM pg_database WHERE datname = 'nadeshiko-prod')\n  AND query NOT LIKE '%pg_stat_statements%'\n  AND query NOT LIKE '%otel-collector-ignore%'\nORDER BY total_exec_time DESC\nLIMIT 25",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Query" },
+            "properties": [{ "id": "custom.width", "value": 500 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Cache Hit %" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "gauge", "mode": "gradient" } },
+              { "id": "min", "value": 0 },
+              { "id": "max", "value": 100 },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 80 }, { "color": "green", "value": 95 }] } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "title": "Searches Over Time",
+      "description": "Hourly search volume",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+      "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+      "targets": [
+        {
+          "rawSql": "SELECT\n  date_trunc('hour', created_at) AS time,\n  COUNT(*) AS \"Searches\",\n  COUNT(DISTINCT user_id) AS \"Unique Searchers\"\nFROM \"UserActivity\"\nWHERE activity_type = 'SEARCH'\n  AND created_at BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1\nORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "pointSize": 5
+          }
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

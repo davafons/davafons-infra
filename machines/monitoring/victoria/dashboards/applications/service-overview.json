@@ -347,6 +347,18 @@
   ],
   "refresh": "1m",
   "tags": ["applications", "overview"],
+  "annotations": {
+    "list": [
+      {
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "iconColor": "rgba(150, 100, 255, 1)",
+        "name": "Deploys",
+        "type": "tags",
+        "tags": ["deploy"]
+      }
+    ]
+  },
   "templating": {
     "list": [
       {

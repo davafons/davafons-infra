@@ -29,6 +29,25 @@ datasources:
     editable: true
     isDefault: false
 
+  - name: Nadeshiko PostgreSQL
+    uid: nadeshiko-postgres
+    type: postgres
+    url: ${NADESHIKO_POSTGRES_HOST}:5432
+    access: proxy
+    editable: true
+    isDefault: false
+    jsonData:
+      database: nadeshiko-prod
+      user: grafana_reader
+      sslmode: disable
+      maxOpenConns: 5
+      maxIdleConns: 2
+      connMaxLifetime: 3600
+      postgresVersion: 1700
+      timescaledb: false
+    secureJsonData:
+      password: ${NADESHIKO_POSTGRES_PASSWORD}
+
   - name: Alertmanager
     uid: alertmanager
     type: alertmanager

@@ -8,6 +8,18 @@
     "from": "now-6h",
     "to": "now"
   },
+  "annotations": {
+    "list": [
+      {
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "iconColor": "rgba(150, 100, 255, 1)",
+        "name": "Deploys",
+        "type": "tags",
+        "tags": ["deploy"]
+      }
+    ]
+  },
   "templating": {
     "list": [
       {
@@ -156,7 +168,7 @@
       },
       "targets": [
         {
-          "expr": "count(count by (error_type) (app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}))",
+          "expr": "count(count by (error_group) (app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}))",
           "legendFormat": "types",
           "refId": "A"
         }
@@ -186,8 +198,8 @@
       },
       "targets": [
         {
-          "expr": "topk(1, sum by (error_type) (increase(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}[$__range])))",
-          "legendFormat": "{{error_type}}",
+          "expr": "topk(1, sum by (error_group) (increase(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}[$__range])))",
+          "legendFormat": "{{error_group}}",
           "refId": "A"
         }
       ]
@@ -202,9 +214,9 @@
     {
       "id": 7,
       "type": "timeseries",
-      "title": "Error Rate by Type",
+      "title": "Error Rate by Message",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -221,8 +233,36 @@
       },
       "targets": [
         {
-          "expr": "topk(10, sum by (error_type) (rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}[5m])))",
-          "legendFormat": "{{error_type}}",
+          "expr": "topk(10, sum by (error_group) (rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}[5m])))",
+          "legendFormat": "{{error_group}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Error Rate by Route",
+      "datasource": { "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (http_route) (rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\", http_route!=\"\"}[5m])))",
+          "legendFormat": "{{http_route}}",
           "refId": "A"
         }
       ]
@@ -237,9 +277,9 @@
     {
       "id": 9,
       "type": "table",
-      "title": "Errors by Type",
+      "title": "Errors by Type and Route",
       "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 15 },
       "fieldConfig": {
         "defaults": {},
         "overrides": [
@@ -249,6 +289,42 @@
               { "id": "unit", "value": "short" },
               { "id": "decimals", "value": 0 },
               { "id": "displayName", "value": "Count" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "error_type" },
+            "properties": [
+              { "id": "displayName", "value": "Error Type" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "error_group" },
+            "properties": [
+              { "id": "displayName", "value": "Message" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "http_route" },
+            "properties": [
+              { "id": "displayName", "value": "Route" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "error_severity" },
+            "properties": [
+              { "id": "displayName", "value": "Severity" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "service_name" },
+            "properties": [
+              { "id": "displayName", "value": "Service" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Time" },
+            "properties": [
+              { "id": "custom.hidden", "value": true }
             ]
           }
         ]
@@ -261,35 +337,28 @@
       },
       "targets": [
         {
-          "expr": "sort_desc(sum by (error_type, error_severity) (increase(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}[$__range])))",
+          "expr": "sort_desc(sum by (error_type, error_group, error_severity, http_route, service_name) (increase(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}[$__range])))",
           "legendFormat": "{{error_type}}",
           "instant": true,
           "format": "table",
           "refId": "A"
         }
-      ]
-    },
-    {
-      "id": 10,
-      "type": "piechart",
-      "title": "Errors by Service",
-      "datasource": { "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" }
-        }
-      },
-      "options": {
-        "pieType": "donut",
-        "legend": { "displayMode": "list", "placement": "right" },
-        "reduceOptions": { "calcs": ["lastNotNull"] }
-      },
-      "targets": [
+      ],
+      "transformations": [
         {
-          "expr": "sum by (service_name) (increase(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"$service\", error_severity=~\"$severity\"}[$__range]))",
-          "legendFormat": "{{service_name}}",
-          "refId": "A"
+          "id": "filterByValue",
+          "options": {
+            "type": "include",
+            "filters": [
+              {
+                "fieldName": "Value",
+                "config": {
+                  "id": "greater",
+                  "options": { "value": 0 }
+                }
+              }
+            ]
+          }
         }
       ]
     },
@@ -297,7 +366,7 @@
       "id": 11,
       "type": "row",
       "title": "Backend Errors",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
       "collapsed": true,
       "panels": [
         {
@@ -305,7 +374,7 @@
           "type": "timeseries",
           "title": "Backend Error Trends",
           "datasource": { "uid": "${datasource}" },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -322,8 +391,8 @@
           },
           "targets": [
             {
-              "expr": "sum by (error_type) (rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"nadeshiko-backend.*\", error_severity=~\"$severity\"}[5m]))",
-              "legendFormat": "{{error_type}}",
+              "expr": "sum by (error_group) (rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"nadeshiko-backend.*\", error_severity=~\"$severity\"}[5m]))",
+              "legendFormat": "{{error_group}}",
               "refId": "A"
             }
           ]
@@ -336,7 +405,7 @@
             "type": "victoriametrics-logs-datasource",
             "uid": "victorialogs"
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
           "options": {
             "enableLogDetails": true,
             "showTime": true,
@@ -362,7 +431,7 @@
       "id": 14,
       "type": "row",
       "title": "Browser Errors",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
       "collapsed": true,
       "panels": [
         {
@@ -370,7 +439,7 @@
           "type": "timeseries",
           "title": "Browser Error Trends",
           "datasource": { "uid": "${datasource}" },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 },
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -387,8 +456,8 @@
           },
           "targets": [
             {
-              "expr": "sum by (error_type) (rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"nadeshiko-frontend-browser.*\", error_severity=~\"$severity\"}[5m]))",
-              "legendFormat": "{{error_type}}",
+              "expr": "sum by (error_group) (rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"nadeshiko-frontend-browser.*\", error_severity=~\"$severity\"}[5m]))",
+              "legendFormat": "{{error_group}}",
               "refId": "A"
             }
           ]
@@ -401,7 +470,7 @@
             "type": "victoriametrics-logs-datasource",
             "uid": "victorialogs"
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 },
           "options": {
             "enableLogDetails": true,
             "showTime": true,
@@ -427,7 +496,7 @@
       "id": 17,
       "type": "row",
       "title": "SSR Errors",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 },
       "collapsed": true,
       "panels": [
         {
@@ -435,7 +504,7 @@
           "type": "timeseries",
           "title": "SSR Error Trends",
           "datasource": { "uid": "${datasource}" },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -452,8 +521,8 @@
           },
           "targets": [
             {
-              "expr": "sum by (error_type) (rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"nadeshiko-frontend.*-web.*\", error_severity=~\"$severity\"}[5m]))",
-              "legendFormat": "{{error_type}}",
+              "expr": "sum by (error_group) (rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"nadeshiko-frontend.*-web.*\", error_severity=~\"$severity\"}[5m]))",
+              "legendFormat": "{{error_group}}",
               "refId": "A"
             }
           ]
@@ -466,7 +535,7 @@
             "type": "victoriametrics-logs-datasource",
             "uid": "victorialogs"
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
           "options": {
             "enableLogDetails": true,
             "showTime": true,
@@ -492,7 +561,7 @@
       "id": 20,
       "type": "row",
       "title": "All Error Logs",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 50 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 },
       "collapsed": true,
       "panels": [
         {
@@ -503,7 +572,7 @@
             "type": "victoriametrics-logs-datasource",
             "uid": "victorialogs"
           },
-          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 51 },
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 53 },
           "options": {
             "enableLogDetails": true,
             "showTime": true,

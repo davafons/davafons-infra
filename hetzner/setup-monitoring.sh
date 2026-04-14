@@ -49,6 +49,12 @@ HAS_POSTGRES=false
 if [[ -n "${POSTGRES_DSN:-}" ]]; then
   HAS_POSTGRES=true
   info "PostgreSQL DSN found — will enable postgresql receiver"
+  # POSTGRES_DATABASES: comma-separated list of databases to monitor (default: all discovered)
+  # When top_query is enabled, the receiver must connect to each database individually
+  # so that prepared statement analysis runs in the correct database context.
+  if [[ -n "${POSTGRES_DATABASES:-}" ]]; then
+    info "PostgreSQL databases to monitor: ${POSTGRES_DATABASES}"
+  fi
 fi
 
 HAS_ELASTICSEARCH=false
@@ -381,14 +387,30 @@ OTELCOL_CONFIG
 
 # --- Optional: PostgreSQL receiver ---
 if $HAS_POSTGRES; then
-cat >> /etc/otelcol-contrib/config.yaml <<'OTELCOL_POSTGRES'
+
+# Build databases YAML list from POSTGRES_DATABASES (comma-separated)
+# When top_query is enabled, the receiver must connect to each database so that
+# prepared statement analysis runs in the correct database context.
+PG_DATABASES_YAML=""
+if [[ -n "${POSTGRES_DATABASES:-}" ]]; then
+  PG_DATABASES_YAML="    databases:"$'\n'
+  IFS=',' read -ra DBS <<< "$POSTGRES_DATABASES"
+  for db in "${DBS[@]}"; do
+    PG_DATABASES_YAML+="      - ${db}"$'\n'
+  done
+fi
+
+# Note: unquoted heredoc (OTELCOL_POSTGRES, not 'OTELCOL_POSTGRES') so $PG_DATABASES_YAML expands.
+# The ${env:...} references are for otelcol-contrib runtime, not bash — they contain colons
+# which bash won't expand, so they pass through safely.
+cat >> /etc/otelcol-contrib/config.yaml <<OTELCOL_POSTGRES
   # --- PostgreSQL metrics ---
   postgresql:
-    endpoint: ${env:POSTGRES_HOST}
+    endpoint: \${env:POSTGRES_HOST}
     transport: tcp
-    username: ${env:POSTGRES_USER}
-    password: ${env:POSTGRES_PASSWORD}
-    collection_interval: 60s
+    username: \${env:POSTGRES_USER}
+    password: \${env:POSTGRES_PASSWORD}
+${PG_DATABASES_YAML}    collection_interval: 60s
     tls:
       insecure: true
     events:
