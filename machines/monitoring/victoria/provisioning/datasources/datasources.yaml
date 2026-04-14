@@ -33,12 +33,12 @@ datasources:
     uid: nadeshiko-postgres
     type: postgres
     url: ${NADESHIKO_POSTGRES_HOST}:5432
+    user: grafana_reader
+    database: nadeshiko-prod
     access: proxy
     editable: true
     isDefault: false
     jsonData:
-      database: nadeshiko-prod
-      user: grafana_reader
       sslmode: disable
       maxOpenConns: 5
       maxIdleConns: 2
