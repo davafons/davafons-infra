@@ -33,11 +33,11 @@
 		// Nadeshiko users can access monitoring services
 		// Caddy HTTPS (443), Grafana (3000), Alertmanager (9093),
 		// VictoriaMetrics (8428), VictoriaLogs (9428),
-		// Gatus (3011), pgAdmin (5050)
+		// Gatus (3011), pgAdmin (5050), SSH (22)
 		{
 			"src": ["group:nadeshiko-users"],
 			"dst": ["tag:monitoring"],
-			"ip":  ["443", "3000", "9093", "8428", "9428", "3011", "5050"],
+			"ip":  ["22", "443", "3000", "9093", "8428", "9428", "3011", "5050"],
 		},
 
 		// All service servers can push metrics/logs/traces to monitoring
@@ -87,11 +87,11 @@
 			"users":  ["root", "autogroup:nonroot"],
 		},
 
-		// Jonathan can SSH into nadeshiko only (browser re-auth required)
+		// Jonathan can SSH into nadeshiko and monitoring (browser re-auth required)
 		{
 			"action": "check",
 			"src":    ["group:nadeshiko-users"],
-			"dst":    ["tag:nadeshiko"],
+			"dst":    ["tag:nadeshiko", "tag:monitoring"],
 			"users":  ["autogroup:nonroot"],
 		},
 
@@ -115,6 +115,7 @@
 			"src":    "group:nadeshiko-users",
 			"accept": [
 				"tag:nadeshiko:443",
+				"tag:monitoring:22",
 				"tag:monitoring:443",
 				"tag:monitoring:3000",
 				"tag:monitoring:9093",
