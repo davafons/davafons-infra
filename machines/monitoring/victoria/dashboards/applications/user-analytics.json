@@ -520,6 +520,38 @@
           "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
           "targets": [{ "rawSql": "SELECT content_rating AS \"Rating\", COUNT(*) AS \"Count\" FROM \"Segment\" WHERE content_rating IS NOT NULL GROUP BY content_rating ORDER BY \"Count\" DESC", "format": "table", "refId": "A" }],
           "options": { "reduceOptions": { "values": true, "calcs": [] }, "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] }, "pieType": "donut" }
+        },
+        {
+          "id": 58,
+          "title": "Hidden Media Usage",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 12, "x": 12, "y": 39 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  COUNT(*) FILTER (WHERE hidden_count > 0) AS \"Users Hiding\",\n  ROUND(100.0 * COUNT(*) FILTER (WHERE hidden_count > 0) / COUNT(*), 1) AS \"% of Users\",\n  COALESCE(SUM(hidden_count) FILTER (WHERE hidden_count > 0), 0) AS \"Total Hidden\",\n  ROUND(AVG(hidden_count) FILTER (WHERE hidden_count > 0), 1) AS \"Avg per User\"\nFROM (\n  SELECT jsonb_array_length(COALESCE(preferences->'hiddenMedia', '[]'::jsonb)) AS hidden_count\n  FROM \"User\"\n) sub", "format": "table", "refId": "A" }],
+          "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "textMode": "value_and_name", "graphMode": "none" }
+        },
+        {
+          "id": 59,
+          "title": "Most Hidden Anime",
+          "description": "Which anime do users hide most frequently?",
+          "type": "table",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 47 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  elem->>'nameRomaji' AS \"Anime\",\n  elem->>'nameEn' AS \"English Name\",\n  COUNT(*) AS \"Times Hidden\"\nFROM \"User\" u,\n  jsonb_array_elements(COALESCE(u.preferences->'hiddenMedia', '[]'::jsonb)) AS elem\nGROUP BY 1, 2\nORDER BY \"Times Hidden\" DESC\nLIMIT 30", "format": "table", "refId": "A" }],
+          "fieldConfig": { "overrides": [
+            { "matcher": { "id": "byName", "options": "Times Hidden" }, "properties": [{ "id": "custom.width", "value": 110 }] }
+          ]}
+        },
+        {
+          "id": 60,
+          "title": "Hidden Count Distribution",
+          "description": "How many anime do users hide?",
+          "type": "piechart",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 47 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  CASE\n    WHEN hidden_count = 0 THEN '0 (none)'\n    WHEN hidden_count BETWEEN 1 AND 5 THEN '1-5'\n    WHEN hidden_count BETWEEN 6 AND 20 THEN '6-20'\n    WHEN hidden_count BETWEEN 21 AND 50 THEN '21-50'\n    ELSE '50+'\n  END AS \"Hidden Count\",\n  COUNT(*) AS \"Users\"\nFROM (\n  SELECT jsonb_array_length(COALESCE(preferences->'hiddenMedia', '[]'::jsonb)) AS hidden_count\n  FROM \"User\"\n) sub\nWHERE hidden_count > 0\nGROUP BY 1\nORDER BY MIN(hidden_count)", "format": "table", "refId": "A" }],
+          "options": { "reduceOptions": { "values": true, "calcs": [] }, "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] }, "pieType": "donut" }
         }
       ]
     },

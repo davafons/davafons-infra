@@ -7,7 +7,6 @@ groups:
           absent(system_cpu_time_seconds_total{host_name="nadeshiko"})
           or absent(system_cpu_time_seconds_total{host_name="monitoring"})
           or absent(system_cpu_time_seconds_total{host_name="inari"})
-          or absent(system_cpu_time_seconds_total{host_name="watchtower"})
         for: 5m
         labels:
           severity: critical
@@ -17,7 +16,7 @@ groups:
       - alert: HostCpuHigh
         expr: |
           (
-            1 - avg by (host_name) (rate(system_cpu_time_seconds_total{state="idle"}[5m]))
+            1 - avg by (host_name) (rate(system_cpu_time_seconds_total{state="idle",host_name!~"watchtower|qtower"}[5m]))
           ) > 0.8
         for: 5m
         labels:
@@ -29,9 +28,9 @@ groups:
       - alert: HostMemoryHigh
         expr: |
           (
-            sum by (host_name) (system_memory_usage_bytes{state="used"})
+            sum by (host_name) (system_memory_usage_bytes{state="used",host_name!~"watchtower|qtower"})
             /
-            sum by (host_name) (system_memory_usage_bytes)
+            sum by (host_name) (system_memory_usage_bytes{host_name!~"watchtower|qtower"})
           ) * 100 > 80
         for: 5m
         labels:
@@ -42,7 +41,7 @@ groups:
 
       - alert: HostDiskLow
         expr: |
-          system_filesystem_usage_bytes{state="free", type!~"tmpfs|devtmpfs|squashfs|vfat"} < 5368709120
+          system_filesystem_usage_bytes{state="free", type!~"tmpfs|devtmpfs|squashfs|vfat",host_name!~"watchtower|qtower"} < 5368709120
         for: 5m
         labels:
           severity: critical
@@ -52,7 +51,7 @@ groups:
 
       - alert: HostDiskWillFill
         expr: |
-          predict_linear(system_filesystem_usage_bytes{state="free", type!~"tmpfs|devtmpfs|squashfs|vfat"}[6h], 24*3600) < 0
+          predict_linear(system_filesystem_usage_bytes{state="free", type!~"tmpfs|devtmpfs|squashfs|vfat",host_name!~"watchtower|qtower"}[6h], 24*3600) < 0
         for: 30m
         labels:
           severity: warning

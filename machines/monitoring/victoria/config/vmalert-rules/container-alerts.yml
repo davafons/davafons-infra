@@ -4,7 +4,7 @@ groups:
     rules:
       - alert: ContainerMemoryHigh
         expr: |
-          avg by (host_name, container_name) (container_memory_percent_ratio) > 80
+          avg by (host_name, container_name) (container_memory_percent_ratio{host_name!~"watchtower|qtower"}) > 80
         for: 5m
         labels:
           severity: warning
@@ -15,7 +15,7 @@ groups:
       - alert: ContainerRestarting
         expr: |
           max by (host_name, container_name) (
-            resets(container_cpu_usage_nanoseconds_total{container_name!="grafana"}[15m])
+            resets(container_cpu_usage_nanoseconds_total{container_name!="grafana",host_name!~"watchtower|qtower"}[15m])
           ) > 2
         for: 0m
         labels:
