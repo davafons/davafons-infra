@@ -161,6 +161,7 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=false
       - GF_INSTALL_PLUGINS=victoriametrics-metrics-datasource,victoriametrics-logs-datasource
       - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=victoriametrics-metrics-datasource,victoriametrics-logs-datasource
+      - GF_PLUGINS_DISABLE_PLUGINS=grafana-lokiexplore-app,grafana-pyroscope-app
       - NADESHIKO_POSTGRES_HOST=${NADESHIKO_POSTGRES_HOST}
       - NADESHIKO_POSTGRES_PASSWORD=${NADESHIKO_POSTGRES_PASSWORD}
     deploy:
