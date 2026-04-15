@@ -10,189 +10,366 @@
   },
   "panels": [
     {
+      "id": 100,
+      "title": "Overview",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
       "id": 1,
-      "title": "Activity Over Time",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "title": "Media",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 1 },
       "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
-      "targets": [
-        {
-          "rawSql": "SELECT\n  date_trunc('hour', created_at) AS time,\n  activity_type AS metric,\n  COUNT(*) AS value\nFROM \"UserActivity\"\nWHERE created_at BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1, 2\nORDER BY 1",
-          "format": "time_series",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "bars",
-            "stacking": { "mode": "normal" },
-            "fillOpacity": 80,
-            "pointSize": 5
-          }
-        },
-        "overrides": []
-      }
+      "targets": [{ "rawSql": "SELECT\n  (SELECT COUNT(*) FROM \"Media\") AS \"Media\",\n  (SELECT COUNT(*) FROM \"Episode\") AS \"Episodes\",\n  (SELECT COUNT(*) FROM \"Segment\") AS \"Segments\",\n  (SELECT COUNT(*) FROM \"Character\") AS \"Characters\",\n  (SELECT COUNT(*) FROM \"Seiyuu\") AS \"Seiyuu\"", "format": "table", "refId": "A" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background_gradient", "textMode": "value_and_name" }
     },
     {
       "id": 2,
-      "title": "Daily Active Users",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "title": "Users",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 1 },
       "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
-      "targets": [
-        {
-          "rawSql": "SELECT\n  date_trunc('day', created_at) AS time,\n  COUNT(DISTINCT user_id) AS \"Active Users\"\nFROM \"UserActivity\"\nWHERE created_at BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1\nORDER BY 1",
-          "format": "time_series",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 20,
-            "pointSize": 5,
-            "showPoints": "always"
-          },
-          "color": { "mode": "fixed", "fixedColor": "green" }
-        }
-      }
+      "targets": [{ "rawSql": "SELECT\n  COUNT(*) AS \"Total Users\",\n  COUNT(*) FILTER (WHERE is_active AND NOT banned) AS \"Active\",\n  COUNT(*) FILTER (WHERE banned) AS \"Banned\",\n  COUNT(*) FILTER (WHERE created_at > now() - interval '7 days') AS \"New (7d)\",\n  COUNT(*) FILTER (WHERE created_at > now() - interval '30 days') AS \"New (30d)\"\nFROM \"User\"", "format": "table", "refId": "A" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background_gradient", "textMode": "value_and_name" }
     },
     {
       "id": 3,
-      "title": "Top Searches",
-      "description": "Most popular search queries in the selected time range",
-      "type": "table",
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 8 },
+      "title": "Activity",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 5 },
       "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
-      "targets": [
-        {
-          "rawSql": "SELECT\n  search_query AS \"Search Query\",\n  COUNT(*) AS \"Count\",\n  COUNT(DISTINCT user_id) AS \"Unique Users\"\nFROM \"UserActivity\"\nWHERE activity_type = 'SEARCH'\n  AND search_query IS NOT NULL\n  AND created_at BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY search_query\nORDER BY \"Count\" DESC\nLIMIT 30",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Count" },
-            "properties": [{ "id": "custom.width", "value": 80 }]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Unique Users" },
-            "properties": [{ "id": "custom.width", "value": 110 }]
-          }
-        ]
-      }
+      "targets": [{ "rawSql": "SELECT\n  COUNT(*) FILTER (WHERE activity_type = 'SEARCH') AS \"Searches\",\n  COUNT(*) FILTER (WHERE activity_type = 'SEGMENT_PLAY') AS \"Segment Plays\",\n  COUNT(*) FILTER (WHERE activity_type = 'ANKI_EXPORT') AS \"Anki Exports\",\n  COUNT(*) FILTER (WHERE activity_type = 'SHARE') AS \"Shares\",\n  COUNT(DISTINCT user_id) AS \"Active Users\"\nFROM \"UserActivity\"\nWHERE created_at BETWEEN $__timeFrom() AND $__timeTo()", "format": "table", "refId": "A" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background_gradient", "textMode": "value_and_name" }
     },
     {
       "id": 4,
-      "title": "Top Media",
-      "description": "Most accessed media content",
-      "type": "table",
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 8 },
+      "title": "Daily Activity",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 9 },
       "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
-      "targets": [
-        {
-          "rawSql": "SELECT\n  COALESCE(a.anime_name, m.romaji_name, m.english_name, 'Unknown') AS \"Media\",\n  COUNT(*) AS \"Total Activity\",\n  COUNT(*) FILTER (WHERE a.activity_type = 'SEGMENT_PLAY') AS \"Plays\",\n  COUNT(*) FILTER (WHERE a.activity_type = 'ANKI_EXPORT') AS \"Exports\",\n  COUNT(*) FILTER (WHERE a.activity_type = 'SEARCH') AS \"Searches\",\n  COUNT(DISTINCT a.user_id) AS \"Unique Users\"\nFROM \"UserActivity\" a\nLEFT JOIN \"Media\" m ON m.id = a.media_id\nWHERE a.created_at BETWEEN $__timeFrom() AND $__timeTo()\n  AND a.media_id IS NOT NULL\nGROUP BY 1\nORDER BY \"Total Activity\" DESC\nLIMIT 20",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Total Activity" },
-            "properties": [{ "id": "custom.width", "value": 110 }]
-          }
-        ]
-      }
+      "targets": [{ "rawSql": "SELECT\n  date_trunc('day', created_at) AS time,\n  activity_type AS metric,\n  COUNT(*) AS value\nFROM \"UserActivity\"\nWHERE created_at BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1, 2\nORDER BY 1", "format": "time_series", "refId": "A" }],
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "stacking": { "mode": "normal" }, "fillOpacity": 80 } } }
     },
+
     {
-      "id": 5,
-      "title": "Activity Totals",
-      "type": "stat",
-      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 18 },
-      "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
-      "targets": [
+      "id": 200,
+      "title": "Users",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "collapsed": true,
+      "panels": [
         {
-          "rawSql": "SELECT\n  COUNT(*) FILTER (WHERE activity_type = 'SEARCH') AS \"Searches\",\n  COUNT(*) FILTER (WHERE activity_type = 'SEGMENT_PLAY') AS \"Segment Plays\",\n  COUNT(*) FILTER (WHERE activity_type = 'ANKI_EXPORT') AS \"Anki Exports\",\n  COUNT(*) FILTER (WHERE activity_type = 'SHARE') AS \"Shares\",\n  COUNT(DISTINCT user_id) AS \"Unique Users\"\nFROM \"UserActivity\"\nWHERE created_at BETWEEN $__timeFrom() AND $__timeTo()",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" }
-        }
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"]
+          "id": 21,
+          "title": "Auth Providers",
+          "type": "piechart",
+          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 18 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  COALESCE(a.provider_id, 'email') AS \"Provider\",\n  COUNT(DISTINCT u.id) AS \"Users\"\nFROM \"User\" u\nLEFT JOIN account a ON a.user_id = u.id\nGROUP BY 1\nORDER BY \"Users\" DESC", "format": "table", "refId": "A" }],
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] }, "pieType": "donut" }
         },
-        "colorMode": "background_gradient",
-        "textMode": "value_and_name"
-      }
-    },
-    {
-      "id": 6,
-      "title": "Top Database Queries",
-      "description": "Most expensive queries from pg_stat_statements (cumulative since last reset)",
-      "type": "table",
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 22 },
-      "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
-      "targets": [
         {
-          "rawSql": "SELECT\n  LEFT(query, 120) AS \"Query\",\n  calls AS \"Calls\",\n  ROUND(total_exec_time::numeric / 1000, 2) AS \"Total Time (s)\",\n  ROUND(mean_exec_time::numeric, 2) AS \"Mean (ms)\",\n  ROUND(max_exec_time::numeric, 2) AS \"Max (ms)\",\n  rows AS \"Rows\",\n  CASE WHEN shared_blks_hit + shared_blks_read > 0\n    THEN ROUND(100.0 * shared_blks_hit / (shared_blks_hit + shared_blks_read), 1)\n    ELSE 100\n  END AS \"Cache Hit %\"\nFROM pg_stat_statements\nWHERE dbid = (SELECT oid FROM pg_database WHERE datname = 'nadeshiko-prod')\n  AND query NOT LIKE '%pg_stat_statements%'\n  AND query NOT LIKE '%otel-collector-ignore%'\nORDER BY total_exec_time DESC\nLIMIT 25",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Query" },
-            "properties": [{ "id": "custom.width", "value": 500 }]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Cache Hit %" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "type": "gauge", "mode": "gradient" } },
-              { "id": "min", "value": 0 },
-              { "id": "max", "value": 100 },
-              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 80 }, { "color": "green", "value": 95 }] } }
+          "id": 22,
+          "title": "User Registrations",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 18, "x": 6, "y": 18 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  date_trunc('day', created_at) AS time,\n  COUNT(*) AS \"Registrations\"\nFROM \"User\"\nWHERE created_at BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1\nORDER BY 1", "format": "time_series", "refId": "A" }],
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 80 }, "color": { "mode": "fixed", "fixedColor": "blue" } } }
+        },
+        {
+          "id": 23,
+          "title": "All Users",
+          "type": "table",
+          "gridPos": { "h": 16, "w": 24, "x": 0, "y": 26 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  u.username AS \"Name\",\n  u.email AS \"Email\",\n  u.role AS \"Role\",\n  COALESCE(STRING_AGG(DISTINCT a.provider_id, ', '), 'email') AS \"Providers\",\n  u.created_at::date AS \"Registered\",\n  GREATEST(u.last_login, MAX(s.updated_at), MAX(ua.created_at)) AS \"Last Seen\",\n  CASE WHEN u.banned THEN 'BANNED' WHEN NOT u.is_active THEN 'INACTIVE' ELSE 'ACTIVE' END AS \"Status\"\nFROM \"User\" u\nLEFT JOIN account a ON a.user_id = u.id\nLEFT JOIN session s ON s.user_id = u.id\nLEFT JOIN (\n  SELECT user_id, MAX(created_at) AS created_at\n  FROM \"UserActivity\"\n  GROUP BY user_id\n) ua ON ua.user_id = u.id\nGROUP BY u.id\nORDER BY u.created_at DESC", "format": "table", "refId": "A" }],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Name" }, "properties": [{ "id": "custom.width", "value": 180 }] },
+              { "matcher": { "id": "byName", "options": "Email" }, "properties": [{ "id": "custom.width", "value": 250 }] },
+              { "matcher": { "id": "byName", "options": "Role" }, "properties": [{ "id": "custom.width", "value": 70 }] },
+              { "matcher": { "id": "byName", "options": "Providers" }, "properties": [{ "id": "custom.width", "value": 120 }] },
+              { "matcher": { "id": "byName", "options": "Registered" }, "properties": [{ "id": "custom.width", "value": 110 }] },
+              { "matcher": { "id": "byName", "options": "Status" }, "properties": [
+                { "id": "custom.width", "value": 90 },
+                { "id": "mappings", "value": [{ "type": "value", "options": { "ACTIVE": { "color": "green", "text": "ACTIVE" }, "BANNED": { "color": "red", "text": "BANNED" }, "INACTIVE": { "color": "orange", "text": "INACTIVE" } } }] },
+                { "id": "custom.cellOptions", "value": { "type": "color-text" } }
+              ]}
             ]
           }
-        ]
-      }
-    },
-    {
-      "id": 7,
-      "title": "Searches Over Time",
-      "description": "Hourly search volume",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
-      "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
-      "targets": [
-        {
-          "rawSql": "SELECT\n  date_trunc('hour', created_at) AS time,\n  COUNT(*) AS \"Searches\",\n  COUNT(DISTINCT user_id) AS \"Unique Searchers\"\nFROM \"UserActivity\"\nWHERE activity_type = 'SEARCH'\n  AND created_at BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1\nORDER BY 1",
-          "format": "time_series",
-          "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 15,
-            "pointSize": 5
+      ]
+    },
+
+    {
+      "id": 300,
+      "title": "Activity",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 31,
+          "title": "Daily Active Users",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  date_trunc('day', created_at) AS time,\n  COUNT(DISTINCT user_id) AS \"Active Users\"\nFROM \"UserActivity\"\nWHERE created_at BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1\nORDER BY 1", "format": "time_series", "refId": "A" }],
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 20, "pointSize": 5, "showPoints": "always" }, "color": { "mode": "fixed", "fixedColor": "green" } } }
+        },
+        {
+          "id": 32,
+          "title": "Searches Over Time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  date_trunc('hour', created_at) AS time,\n  COUNT(*) AS \"Searches\",\n  COUNT(DISTINCT user_id) AS \"Unique Searchers\"\nFROM \"UserActivity\"\nWHERE activity_type = 'SEARCH'\n  AND created_at BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1\nORDER BY 1", "format": "time_series", "refId": "A" }],
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 15, "pointSize": 5 } } }
+        },
+        {
+          "id": 33,
+          "title": "Export Volume",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 27 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  date_trunc('day', created_at) AS time,\n  COUNT(*) AS \"Exports\"\nFROM \"UserActivity\"\nWHERE activity_type = 'ANKI_EXPORT'\n  AND created_at BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1\nORDER BY 1", "format": "time_series", "refId": "A" }],
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 15, "gradientMode": "scheme" }, "color": { "mode": "fixed", "fixedColor": "orange" } } }
+        },
+        {
+          "id": 34,
+          "title": "Top Searches",
+          "type": "table",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 35 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  search_query AS \"Search Query\",\n  COUNT(*) AS \"Count\",\n  COUNT(DISTINCT user_id) AS \"Unique Users\"\nFROM \"UserActivity\"\nWHERE activity_type = 'SEARCH'\n  AND search_query IS NOT NULL\n  AND created_at BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY search_query\nORDER BY \"Count\" DESC\nLIMIT 30", "format": "table", "refId": "A" }],
+          "fieldConfig": { "overrides": [
+            { "matcher": { "id": "byName", "options": "Count" }, "properties": [{ "id": "custom.width", "value": 80 }] },
+            { "matcher": { "id": "byName", "options": "Unique Users" }, "properties": [{ "id": "custom.width", "value": 110 }] }
+          ]}
+        },
+        {
+          "id": 35,
+          "title": "Most Exported Media",
+          "type": "table",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 35 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  COALESCE(a.anime_name, m.romaji_name, m.english_name, 'Unknown') AS \"Media\",\n  COUNT(*) AS \"Exports\",\n  COUNT(DISTINCT a.user_id) AS \"Unique Users\"\nFROM \"UserActivity\" a\nLEFT JOIN \"Media\" m ON m.id = a.media_id\nWHERE a.activity_type = 'ANKI_EXPORT'\n  AND a.created_at BETWEEN $__timeFrom() AND $__timeTo()\n  AND a.media_id IS NOT NULL\nGROUP BY 1\nORDER BY \"Exports\" DESC\nLIMIT 20", "format": "table", "refId": "A" }],
+          "fieldConfig": { "overrides": [
+            { "matcher": { "id": "byName", "options": "Exports" }, "properties": [{ "id": "custom.width", "value": 80 }] },
+            { "matcher": { "id": "byName", "options": "Unique Users" }, "properties": [{ "id": "custom.width", "value": 110 }] }
+          ]}
+        }
+      ]
+    },
+
+    {
+      "id": 400,
+      "title": "API Keys",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 41,
+          "title": "API Keys",
+          "type": "table",
+          "gridPos": { "h": 14, "w": 24, "x": 0, "y": 20 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  aa.name AS \"Name\",\n  aa.hint AS \"Hint\",\n  u.username AS \"User\",\n  u.email AS \"Email\",\n  CASE WHEN aa.is_active THEN 'ACTIVE' ELSE 'INACTIVE' END AS \"Status\",\n  aa.created_at::date AS \"Created\"\nFROM \"ApiAuth\" aa\nJOIN \"User\" u ON u.id = aa.user_id\nORDER BY aa.created_at DESC", "format": "table", "refId": "A" }],
+          "fieldConfig": {
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Hint" }, "properties": [{ "id": "custom.width", "value": 180 }] },
+              { "matcher": { "id": "byName", "options": "Status" }, "properties": [
+                { "id": "custom.width", "value": 90 },
+                { "id": "mappings", "value": [{ "type": "value", "options": { "ACTIVE": { "color": "green", "text": "ACTIVE" }, "INACTIVE": { "color": "red", "text": "INACTIVE" } } }] },
+                { "id": "custom.cellOptions", "value": { "type": "color-text" } }
+              ]}
+            ]
           }
         }
-      }
+      ]
+    },
+
+    {
+      "id": 500,
+      "title": "Media",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 51,
+          "title": "By Category",
+          "type": "piechart",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 21 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT category AS \"Category\", COUNT(*) AS \"Count\" FROM \"Media\" GROUP BY category ORDER BY \"Count\" DESC", "format": "table", "refId": "A" }],
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] }, "pieType": "donut" }
+        },
+        {
+          "id": 52,
+          "title": "By Airing Status",
+          "type": "piechart",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 21 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT airing_status AS \"Status\", COUNT(*) AS \"Count\" FROM \"Media\" GROUP BY airing_status ORDER BY \"Count\" DESC", "format": "table", "refId": "A" }],
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] }, "pieType": "donut" }
+        },
+        {
+          "id": 53,
+          "title": "By Format",
+          "type": "barchart",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 21 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT airing_format AS \"Format\", COUNT(*) AS \"Count\" FROM \"Media\" GROUP BY airing_format ORDER BY \"Count\" DESC", "format": "table", "refId": "A" }],
+          "options": { "orientation": "horizontal" },
+          "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } }
+        },
+        {
+          "id": 54,
+          "title": "Top Genres",
+          "type": "barchart",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 29 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT unnest(genres) AS \"Genre\", COUNT(*) AS \"Count\" FROM \"Media\" GROUP BY 1 ORDER BY \"Count\" DESC LIMIT 15", "format": "table", "refId": "A" }],
+          "options": { "orientation": "horizontal" },
+          "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } }
+        },
+        {
+          "id": 55,
+          "title": "Top Studios",
+          "type": "barchart",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 29 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT studio AS \"Studio\", COUNT(*) AS \"Count\" FROM \"Media\" WHERE studio IS NOT NULL GROUP BY studio ORDER BY \"Count\" DESC LIMIT 15", "format": "table", "refId": "A" }],
+          "options": { "orientation": "horizontal" },
+          "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } }
+        },
+        {
+          "id": 56,
+          "title": "Segments by Content Rating",
+          "type": "piechart",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 39 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT content_rating AS \"Rating\", COUNT(*) AS \"Count\" FROM \"Segment\" WHERE content_rating IS NOT NULL GROUP BY content_rating ORDER BY \"Count\" DESC", "format": "table", "refId": "A" }],
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] }, "pieType": "donut" }
+        },
+        {
+          "id": 57,
+          "title": "Top Media by Interaction",
+          "type": "table",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 47 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  COALESCE(a.anime_name, m.romaji_name, m.english_name, 'Unknown') AS \"Media\",\n  COUNT(*) AS \"Total\",\n  COUNT(*) FILTER (WHERE a.activity_type = 'SEGMENT_PLAY') AS \"Plays\",\n  COUNT(*) FILTER (WHERE a.activity_type = 'SEARCH') AS \"Searches\",\n  COUNT(*) FILTER (WHERE a.activity_type = 'ANKI_EXPORT') AS \"Exports\",\n  COUNT(DISTINCT a.user_id) AS \"Unique Users\"\nFROM \"UserActivity\" a\nLEFT JOIN \"Media\" m ON m.id = a.media_id\nWHERE a.created_at BETWEEN $__timeFrom() AND $__timeTo()\n  AND a.media_id IS NOT NULL\nGROUP BY 1\nORDER BY \"Total\" DESC\nLIMIT 20", "format": "table", "refId": "A" }],
+          "fieldConfig": { "overrides": [
+            { "matcher": { "id": "byName", "options": "Total" }, "properties": [{ "id": "custom.width", "value": 80 }] }
+          ]}
+        }
+      ]
+    },
+
+    {
+      "id": 600,
+      "title": "Collections",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 61,
+          "title": "Collection Stats",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 12, "x": 0, "y": 22 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  (SELECT COUNT(*) FROM \"Collection\") AS \"Total Collections\",\n  (SELECT ROUND(AVG(cnt)::numeric, 1) FROM (SELECT COUNT(*) AS cnt FROM \"CollectionSegment\" GROUP BY collection_id) sub) AS \"Avg Size\"", "format": "table", "refId": "A" }],
+          "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background_gradient", "textMode": "value_and_name" }
+        },
+        {
+          "id": 62,
+          "title": "By Type & Visibility",
+          "type": "piechart",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 26 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT collection_type || ' / ' || visibility AS \"Type\", COUNT(*) AS \"Count\" FROM \"Collection\" GROUP BY collection_type, visibility ORDER BY \"Count\" DESC", "format": "table", "refId": "A" }],
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] }, "pieType": "donut" }
+        },
+        {
+          "id": 63,
+          "title": "Top Collections",
+          "type": "table",
+          "gridPos": { "h": 8, "w": 16, "x": 8, "y": 26 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  c.name AS \"Name\",\n  u.username AS \"Owner\",\n  c.collection_type AS \"Type\",\n  c.visibility AS \"Visibility\",\n  COUNT(cs.segment_id) AS \"Segments\"\nFROM \"Collection\" c\nJOIN \"User\" u ON u.id = c.user_id\nLEFT JOIN \"CollectionSegment\" cs ON cs.collection_id = c.id\nGROUP BY c.id, u.username\nORDER BY \"Segments\" DESC\nLIMIT 20", "format": "table", "refId": "A" }],
+          "fieldConfig": { "overrides": [
+            { "matcher": { "id": "byName", "options": "Segments" }, "properties": [{ "id": "custom.width", "value": 90 }] }
+          ]}
+        }
+      ]
+    },
+
+    {
+      "id": 700,
+      "title": "System",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 71,
+          "title": "Queue Health",
+          "type": "table",
+          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 23 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  name AS \"Queue\",\n  COUNT(*) FILTER (WHERE state = 'created') AS \"Pending\",\n  COUNT(*) FILTER (WHERE state = 'active') AS \"Active\",\n  COUNT(*) FILTER (WHERE state = 'completed') AS \"Completed\",\n  COUNT(*) FILTER (WHERE state = 'failed') AS \"Failed\",\n  COUNT(*) FILTER (WHERE state = 'active' AND started_on < now() - interval '5 minutes') AS \"Stuck\"\nFROM pgboss.job\nGROUP BY name\nORDER BY name", "format": "table", "refId": "A" }],
+          "fieldConfig": { "overrides": [
+            { "matcher": { "id": "byName", "options": "Failed" }, "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }
+            ]},
+            { "matcher": { "id": "byName", "options": "Stuck" }, "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }] } }
+            ]}
+          ]}
+        },
+        {
+          "id": 72,
+          "title": "Database Size",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 23 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  pg_size_pretty(pg_database_size('nadeshiko-prod')) AS \"DB Size\",\n  (SELECT COUNT(*) FROM pg_stat_activity WHERE datname = 'nadeshiko-prod') AS \"Connections\",\n  (SELECT setting FROM pg_settings WHERE name = 'max_connections') AS \"Max Connections\",\n  version() AS \"Version\"", "format": "table", "refId": "A" }],
+          "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background_gradient", "textMode": "value_and_name" }
+        },
+        {
+          "id": 73,
+          "title": "Top Database Queries",
+          "type": "table",
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 29 },
+          "datasource": { "uid": "nadeshiko-postgres", "type": "postgres" },
+          "targets": [{ "rawSql": "SELECT\n  LEFT(query, 120) AS \"Query\",\n  calls AS \"Calls\",\n  ROUND(total_exec_time::numeric / 1000, 2) AS \"Total (s)\",\n  ROUND(mean_exec_time::numeric, 2) AS \"Mean (ms)\",\n  ROUND(max_exec_time::numeric, 2) AS \"Max (ms)\",\n  rows AS \"Rows\",\n  CASE WHEN shared_blks_hit + shared_blks_read > 0\n    THEN ROUND(100.0 * shared_blks_hit / (shared_blks_hit + shared_blks_read), 1)\n    ELSE 100\n  END AS \"Cache Hit %\"\nFROM pg_stat_statements\nWHERE dbid = (SELECT oid FROM pg_database WHERE datname = 'nadeshiko-prod')\n  AND query NOT LIKE '%pg_stat_statements%'\n  AND query NOT LIKE '%otel-collector-ignore%'\nORDER BY total_exec_time DESC\nLIMIT 25", "format": "table", "refId": "A" }],
+          "fieldConfig": {
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Query" }, "properties": [{ "id": "custom.width", "value": 500 }] },
+              { "matcher": { "id": "byName", "options": "Cache Hit %" }, "properties": [
+                { "id": "custom.cellOptions", "value": { "type": "gauge", "mode": "gradient" } },
+                { "id": "min", "value": 0 },
+                { "id": "max", "value": 100 },
+                { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 80 }, { "color": "green", "value": 95 }] } }
+              ]}
+            ]
+          }
+        }
+      ]
     }
   ],
   "schemaVersion": 39,

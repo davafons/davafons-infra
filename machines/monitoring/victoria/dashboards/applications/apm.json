@@ -57,7 +57,7 @@
         "datasource": {
           "uid": "${datasource}"
         },
-        "query": "label_values(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\"}, service_name)",
+        "query": "label_values(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\"}, service_name)",
         "refresh": 2,
         "includeAll": false,
         "multi": false,
@@ -118,46 +118,8 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval]))",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval]))",
           "legendFormat": "req/s",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "type": "stat",
-      "title": "5xx Rate",
-      "datasource": {
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 6,
-        "y": 1
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "decimals": 2,
-          "thresholds": {
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 1 },
-              { "color": "red", "value": 5 }
-            ]
-          }
-        }
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "reduceOptions": { "calcs": ["lastNotNull"] }
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_response_status_code=~\"5..\"}[$__rate_interval])) * 100 / sum(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])) or vector(0)",
-          "legendFormat": "5xx",
           "refId": "A"
         }
       ]
@@ -171,7 +133,7 @@
       "gridPos": {
         "h": 4,
         "w": 3,
-        "x": 9,
+        "x": 6,
         "y": 1
       },
       "fieldConfig": {
@@ -194,8 +156,46 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_response_status_code=~\"4..\"}[$__rate_interval])) * 100 / sum(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])) or vector(0)",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_response_status_code=~\"4..\"}[$__rate_interval])) * 100 / sum(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])) or vector(0)",
           "legendFormat": "4xx",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "5xx Rate",
+      "datasource": {
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 9,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_response_status_code=~\"5..\"}[$__rate_interval])) * 100 / sum(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "5xx",
           "refId": "A"
         }
       ]
@@ -245,7 +245,7 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "refId": "A"
         }
@@ -382,31 +382,31 @@
       },
       "targets": [
         {
-          "expr": "sum by (operation) (label_join(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\")) > 0",
+          "expr": "sum by (operation) (label_join(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\")) > 0",
           "format": "table",
           "instant": true,
           "refId": "rate"
         },
         {
-          "expr": "(sum by (operation) (label_join(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\", http_response_status_code=~\"5..\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\")) * 100 / sum by (operation) (label_join(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\"))) or (0 * sum by (operation) (label_join(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\")))",
+          "expr": "(sum by (operation) (label_join(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\", http_response_status_code=~\"5..\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\")) * 100 / sum by (operation) (label_join(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\"))) or (0 * sum by (operation) (label_join(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\")))",
           "format": "table",
           "instant": true,
           "refId": "5xx"
         },
         {
-          "expr": "(sum by (operation) (label_join(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\", http_response_status_code=~\"4..\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\")) * 100 / sum by (operation) (label_join(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\"))) or (0 * sum by (operation) (label_join(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\")))",
+          "expr": "(sum by (operation) (label_join(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\", http_response_status_code=~\"4..\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\")) * 100 / sum by (operation) (label_join(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\"))) or (0 * sum by (operation) (label_join(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\")))",
           "format": "table",
           "instant": true,
           "refId": "4xx"
         },
         {
-          "expr": "histogram_quantile(0.5, sum by (le, operation) (label_join(rate(http_server_request_duration_seconds_bucket{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\")))",
+          "expr": "histogram_quantile(0.5, sum by (le, operation) (label_join(rate(http_server_request_duration_seconds_bucket{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\")))",
           "format": "table",
           "instant": true,
           "refId": "p50"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le, operation) (label_join(rate(http_server_request_duration_seconds_bucket{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\")))",
+          "expr": "histogram_quantile(0.95, sum by (le, operation) (label_join(rate(http_server_request_duration_seconds_bucket{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"operation\", \" \", \"http_request_method\", \"http_route\")))",
           "format": "table",
           "instant": true,
           "refId": "p95"
@@ -421,8 +421,8 @@
             "indexByName": {
               "operation": 0,
               "Value #rate": 1,
-              "Value #5xx": 2,
-              "Value #4xx": 3,
+              "Value #4xx": 2,
+              "Value #5xx": 3,
               "Value #p50": 4,
               "Value #p95": 5
             }
@@ -479,7 +479,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (operation) (label_join(label_join(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"op\", \" \", \"http_response_status_code\", \"http_request_method\"), \"operation\", \" \", \"op\", \"http_route\")) > 0",
+          "expr": "sum by (operation) (label_join(label_join(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]), \"op\", \" \", \"http_response_status_code\", \"http_request_method\"), \"operation\", \" \", \"op\", \"http_route\")) > 0",
           "legendFormat": "{{operation}}",
           "refId": "A"
         }
@@ -519,17 +519,17 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_seconds_bucket{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_seconds_bucket{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "refId": "C"
         }
@@ -558,7 +558,7 @@
       },
       "targets": [
         {
-          "expr": "topk(10, histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]))))",
+          "expr": "topk(10, histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\"}[$__rate_interval]))))",
           "legendFormat": "{{ http_route }}",
           "refId": "A"
         }
@@ -598,12 +598,12 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "5xx" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
-          },
-          {
             "matcher": { "id": "byName", "options": "4xx" },
             "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "5xx" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
           }
         ]
       },
@@ -613,13 +613,13 @@
       },
       "targets": [
         {
-          "expr": "(sum(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_response_status_code=~\"5..\"}[$__rate_interval])) * 100 / sum(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval]))) or (0 * sum(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
-          "legendFormat": "5xx",
+          "expr": "(sum(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_response_status_code=~\"4..\"}[$__rate_interval])) * 100 / sum(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval]))) or (0 * sum(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
+          "legendFormat": "4xx",
           "refId": "A"
         },
         {
-          "expr": "(sum(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_response_status_code=~\"4..\"}[$__rate_interval])) * 100 / sum(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval]))) or (0 * sum(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
-          "legendFormat": "4xx",
+          "expr": "(sum(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_response_status_code=~\"5..\"}[$__rate_interval])) * 100 / sum(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval]))) or (0 * sum(rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
+          "legendFormat": "5xx",
           "refId": "B"
         }
       ]
@@ -648,7 +648,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (http_route, http_response_status_code) (rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_route!=\"\", http_response_status_code=~\"[45]..\"}[$__rate_interval])) > 0",
+          "expr": "sum by (http_route, http_response_status_code) (rate(http_server_request_duration_seconds_count{http_route!~\"/__[^o].*\", deployment_environment=\"${environment}\", service_name=\"${service}\", http_response_status_code=~\"[45]..\"}[$__rate_interval])) > 0",
           "legendFormat": "{{ http_response_status_code }} {{ http_route }}",
           "refId": "A"
         }
@@ -828,7 +828,7 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_body_size_bytes_bucket{scope_name!=\"@opentelemetry/instrumentation-http\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_body_size_bytes_bucket{deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
           "legendFormat": "p95 request",
           "refId": "A"
         }
@@ -857,7 +857,7 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_response_body_size_bytes_bucket{scope_name!=\"@opentelemetry/instrumentation-http\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_response_body_size_bytes_bucket{deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])))",
           "legendFormat": "p95 response",
           "refId": "A"
         }
@@ -865,171 +865,48 @@
     },
     {
       "type": "row",
-      "title": "Unmatched Requests",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 100 },
-      "collapsed": true,
-      "panels": [
+      "title": "Logs",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 72
+      },
+      "collapsed": false
+    },
+    {
+      "type": "logs",
+      "title": "Service Logs",
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 73
+      },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
         {
-          "type": "timeseries",
-          "title": "Total HTTP vs App-Instrumented Traffic",
-          "description": "The HTTP instrumentation scope captures all requests. The app scope only captures route-matched requests. The gap between these two lines is unmatched traffic (bots, scanners, static assets).",
-          "datasource": { "uid": "${datasource}" },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 101 },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "reqps",
-              "decimals": 1,
-              "custom": {
-                "fillOpacity": 10,
-                "lineWidth": 2,
-                "spanNulls": true
-              },
-              "color": { "mode": "palette-classic" }
-            }
+          "datasource": {
+            "type": "victoriametrics-logs-datasource",
+            "uid": "victorialogs"
           },
-          "options": {
-            "legend": { "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi", "sort": "desc" }
-          },
-          "targets": [
-            {
-              "expr": "sum(rate(http_server_request_duration_seconds_count{scope_name=\"@opentelemetry/instrumentation-http\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval]))",
-              "legendFormat": "total HTTP",
-              "refId": "A"
-            },
-            {
-              "expr": "sum(rate(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval]))",
-              "legendFormat": "app-instrumented",
-              "refId": "B"
-            }
-          ]
-        },
-        {
-          "type": "timeseries",
-          "title": "Unmatched Request Rate",
-          "description": "Requests seen by the HTTP layer but not by the app instrumentation. Uses increase() over 5m windows to smooth out rate timing artifacts.",
-          "datasource": { "uid": "${datasource}" },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 101 },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "reqps",
-              "decimals": 1,
-              "min": 0,
-              "custom": {
-                "fillOpacity": 10,
-                "lineWidth": 2,
-                "spanNulls": true
-              },
-              "color": { "fixedColor": "orange", "mode": "fixed" }
-            }
-          },
-          "options": {
-            "legend": { "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi", "sort": "desc" }
-          },
-          "targets": [
-            {
-              "expr": "clamp_min(sum(increase(http_server_request_duration_seconds_count{scope_name=\"@opentelemetry/instrumentation-http\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[5m])) - sum(increase(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[5m])), 0) / 300",
-              "legendFormat": "unmatched req/s",
-              "refId": "A"
-            }
-          ]
-        },
-        {
-          "type": "stat",
-          "title": "Unmatched Traffic %",
-          "description": "Percentage of total HTTP requests not captured by the app instrumentation. Uses increase() over the dashboard time range.",
-          "datasource": { "uid": "${datasource}" },
-          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 109 },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "percentunit",
-              "decimals": 1,
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 0.05 },
-                  { "color": "red", "value": 0.15 }
-                ]
-              }
-            }
-          },
-          "options": {
-            "colorMode": "background",
-            "graphMode": "area",
-            "reduceOptions": { "calcs": ["lastNotNull"] }
-          },
-          "targets": [
-            {
-              "expr": "clamp_min(1 - (sum(increase(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__range])) / sum(increase(http_server_request_duration_seconds_count{scope_name=\"@opentelemetry/instrumentation-http\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__range]))), 0)",
-              "legendFormat": "unmatched %",
-              "refId": "A"
-            }
-          ]
-        },
-        {
-          "type": "stat",
-          "title": "Unmatched Rate",
-          "datasource": { "uid": "${datasource}" },
-          "gridPos": { "h": 8, "w": 6, "x": 6, "y": 109 },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "reqps",
-              "decimals": 1,
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 1 },
-                  { "color": "red", "value": 5 }
-                ]
-              }
-            }
-          },
-          "options": {
-            "colorMode": "background",
-            "graphMode": "area",
-            "reduceOptions": { "calcs": ["lastNotNull"] }
-          },
-          "targets": [
-            {
-              "expr": "clamp_min(sum(increase(http_server_request_duration_seconds_count{scope_name=\"@opentelemetry/instrumentation-http\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[5m])) - sum(increase(http_server_request_duration_seconds_count{scope_name!=\"@opentelemetry/instrumentation-http\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[5m])), 0) / 300",
-              "legendFormat": "unmatched req/s",
-              "refId": "A"
-            }
-          ]
-        },
-        {
-          "type": "timeseries",
-          "title": "HTTP Scope Status Codes (all traffic)",
-          "description": "Status code breakdown from the HTTP instrumentation scope, which captures all requests including unmatched ones.",
-          "datasource": { "uid": "${datasource}" },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 109 },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "reqps",
-              "decimals": 2,
-              "custom": {
-                "fillOpacity": 20,
-                "lineWidth": 2,
-                "spanNulls": true,
-                "stacking": { "mode": "normal" }
-              },
-              "color": { "mode": "palette-classic" }
-            }
-          },
-          "options": {
-            "legend": { "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "multi", "sort": "desc" }
-          },
-          "targets": [
-            {
-              "expr": "sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count{scope_name=\"@opentelemetry/instrumentation-http\", deployment_environment=\"${environment}\", service_name=\"${service}\"}[$__rate_interval])) > 0",
-              "legendFormat": "{{http_response_status_code}}",
-              "refId": "A"
-            }
-          ]
+          "expr": "{service.name=~\"${service}.*\", deployment.environment=~\"${environment}.*\"}",
+          "maxLines": 500,
+          "queryType": "instant",
+          "refId": "A"
         }
       ]
     }

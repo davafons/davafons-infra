@@ -521,7 +521,7 @@
           },
           "targets": [
             {
-              "expr": "sum by (error_group) (rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"nadeshiko-frontend.*-web.*\", error_severity=~\"$severity\"}[5m]))",
+              "expr": "sum by (error_group) (rate(app_exception_bytes_total{deployment_environment=\"$environment\", service_name=~\"nadeshiko-frontend.*\", error_severity=~\"$severity\"}[5m]))",
               "legendFormat": "{{error_group}}",
               "refId": "A"
             }

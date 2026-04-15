@@ -134,13 +134,6 @@ processors:
       # Normalize high-cardinality metric attributes and drop noise
       - context: datapoint
         statements:
-          # === Normalize http_route: collapse raw IDs/UUIDs into parameterized paths ===
-          - replace_pattern(attributes["http.route"], "/v1/media/segments/[^/]+", "/v1/media/segments/:uuid")
-          - replace_pattern(attributes["http.route"], "/v1/collections/[^/]+", "/v1/collections/:id")
-          - replace_pattern(attributes["http.route"], "/v1/media/[^/]+$$", "/v1/media/:id")
-          - replace_pattern(attributes["http.route"], "/user/[^/]+$$", "/user/:slug")
-          # Nuxt static assets
-          - replace_pattern(attributes["http.route"], "/_nuxt/.*", "/_nuxt/:asset")
           # === Drop useless metric labels ===
           - delete_key(attributes, "url.scheme")
           - delete_key(attributes, "network.protocol.version")
